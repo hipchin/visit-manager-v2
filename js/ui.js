@@ -316,18 +316,40 @@ window.UI = (() => {
     visitHistory = history.slice();
     const list = document.getElementById('visit-history-list');
     list.innerHTML = '';
+
+    const metVisitCountMap = new Map();
+    visitHistory
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => !item.absent)
+      .sort((a, b) => {
+        const da = new Date(a.item.date).getTime();
+        const db = new Date(b.item.date).getTime();
+        if (da !== db) return da - db;
+        return a.index - b.index;
+      })
+      .forEach(({ index }, order) => {
+        metVisitCountMap.set(index, order + 1);
+      });
+
     const sorted = visitHistory
       .map((item, index) => ({ item, index }))
-      .sort((a, b) => new Date(b.item.date) - new Date(a.item.date));
+      .sort((a, b) => {
+        const da = new Date(b.item.date).getTime();
+        const db = new Date(a.item.date).getTime();
+        if (da !== db) return da - db;
+        return b.index - a.index;
+      });
 
     sorted.forEach(({ item, index }) => {
       const el = document.createElement('div');
-      el.className = 'history-item' + (item.absent ? ' absent' : '');
+      const metVisitCount = metVisitCountMap.get(index);
+      el.className = 'history-item' + (item.absent ? ' absent' : ' met');
       el.innerHTML = `
         <div class="history-item-main">
+          ${metVisitCount ? `<div class="history-label-row"><span class="history-count-badge">${metVisitCount}回目</span></div>` : ''}
           <div class="history-item-top">
             <span class="history-date">${item.absent ? '🚪 ' : ''}${window.formatDate(item.date)}</span>
-            <span class="history-time">${item.absent ? '不在' : window.timeLabel(item.time)}</span>
+            <span class="history-time">${item.absent ? '不在' : (window.timeLabel(item.time) || '時間帯未設定')}</span>
           </div>
           ${item.memo ? `<div class="history-memo">${escapeHtml(item.memo)}</div>` : ''}
         </div>
