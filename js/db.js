@@ -11,7 +11,7 @@ window.DB = (() => {
     version: 'vm_version'
   };
 
-  const APP_VERSION = '1.0.5';
+  const APP_VERSION = '1.0.6';
 
   function load(key, fallback) {
     try {
@@ -121,6 +121,19 @@ window.DB = (() => {
     return tag;
   }
 
+  function updateTag(id, patch) {
+    const tags = getTags();
+    const idx = tags.findIndex(t => t.id === id);
+    if (idx === -1) return null;
+    tags[idx] = {
+      ...tags[idx],
+      name: patch.name || tags[idx].name,
+      color: patch.color || tags[idx].color
+    };
+    saveTags(tags);
+    return tags[idx];
+  }
+
   function deleteTag(id) {
     const tags = getTags().filter(t => t.id !== id);
     saveTags(tags);
@@ -202,7 +215,7 @@ window.DB = (() => {
   return {
     getVisits, saveVisits, addVisit, updateVisit, getVisitById,
     getTrash, moveToTrash, restoreFromTrash, purgeExpiredTrash,
-    getTags, saveTags, addTag, deleteTag,
+    getTags, saveTags, addTag, updateTag, deleteTag,
     getBackupDate, setBackupDate,
     exportData, importData,
     snapshotToIndexedDB,

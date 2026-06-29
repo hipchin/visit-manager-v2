@@ -89,8 +89,24 @@
       window.UI.showScreen('detail');
     });
 
-    // リストのカードタップ
-    document.getElementById('visit-list').addEventListener('click', e => {
+    // リストのカードタップ・マップ・スワイプ削除
+    document.getElementById('visit-list').addEventListener('click', async e => {
+      const deleteBtn = e.target.closest('.swipe-delete-btn');
+      if (deleteBtn) {
+        e.stopPropagation();
+        if (!await confirmDialog('ゴミ箱に移しますか？30日後に完全削除されます。')) return;
+        window.DB.moveToTrash(deleteBtn.dataset.id);
+        window.UI.toast('ゴミ箱に移しました');
+        renderList();
+        return;
+      }
+
+      const row = e.target.closest('.swipe-row');
+      if (row && row.classList.contains('swiped')) {
+        row.classList.remove('swiped');
+        return;
+      }
+
       const card = e.target.closest('.visit-card');
       const mapBtn = e.target.closest('.card-map-btn');
       if (mapBtn) {
@@ -166,48 +182,55 @@
     document.querySelector('#modal-tag-picker .modal-backdrop').addEventListener('click', window.UI.closeTagPicker);
 
     // 訪問記録（会えた）
-    document.getElementById('btn-add-visit').addEventListener('click', window.UI.openVisitModal);
+    document.getElementById('btn-add-visit').addEventListener('click', () => window.UI.openVisitModal());
     document.getElementById('btn-close-visit').addEventListener('click', window.UI.closeVisitModal);
     document.querySelector('#modal-visit .modal-backdrop').addEventListener('click', window.UI.closeVisitModal);
     document.getElementById('btn-save-visit').addEventListener('click', () => {
       const data = window.UI.getVisitFormData();
       if (!data.date) { window.UI.toast('日付を選択してください'); return; }
-      window.UI.addVisitToHistory(data);
-      if (!document.getElementById('field-last-visit').value || data.date > document.getElementById('field-last-visit').value) {
-        document.getElementById('field-last-visit').value = data.date;
-        document.querySelectorAll('#time-options .time-chip').forEach(c => c.classList.remove('selected'));
-        const chip = document.querySelector(`#time-options .time-chip[data-value="${data.time}"]`);
-        if (chip) chip.classList.add('selected');
-      }
+      window.UI.saveVisitHistoryItem(data);
+      syncLastVisitFromHistory();
+      const saved = autoSaveCurrentEntry();
       window.UI.closeVisitModal();
-      window.UI.toast('訪問を記録しました');
+      window.UI.toast(saved ? '訪問を保存しました' : '訪問を記録しました');
     });
 
     // 不在記録
-    document.getElementById('btn-add-absent').addEventListener('click', () => {
-      const today = new Date().toISOString().slice(0, 10);
-      document.getElementById('absent-date').value = today;
-      document.getElementById('absent-memo').value = '';
-      document.getElementById('modal-absent').classList.remove('hidden');
-    });
-    document.getElementById('btn-close-absent').addEventListener('click', () => {
-      document.getElementById('modal-absent').classList.add('hidden');
-    });
-    document.querySelector('#modal-absent .modal-backdrop').addEventListener('click', () => {
-      document.getElementById('modal-absent').classList.add('hidden');
-    });
+    document.getElementById('btn-add-absent').addEventListener('click', () => window.UI.openAbsentModal());
+    document.getElementById('btn-close-absent').addEventListener('click', window.UI.closeAbsentModal);
+    document.querySelector('#modal-absent .modal-backdrop').addEventListener('click', window.UI.closeAbsentModal);
     document.getElementById('btn-save-absent').addEventListener('click', () => {
-      const date = document.getElementById('absent-date').value;
-      if (!date) { window.UI.toast('日付を選択してください'); return; }
-      const memo = document.getElementById('absent-memo').value.trim();
-      window.UI.addVisitToHistory({ date, absent: true, memo });
-      // 日数カウントのため最終訪問日を更新
-      const lastVisitField = document.getElementById('field-last-visit');
-      if (!lastVisitField.value || date > lastVisitField.value) {
-        lastVisitField.value = date;
+      const data = window.UI.getAbsentFormData();
+      if (!data.date) { window.UI.toast('日付を選択してください'); return; }
+      window.UI.saveVisitHistoryItem(data);
+      syncLastVisitFromHistory();
+      const saved = autoSaveCurrentEntry();
+      window.UI.closeAbsentModal();
+      window.UI.toast(saved ? '不在を保存しました' : '不在を記録しました');
+    });
+
+    // 訪問履歴 編集・削除
+    document.getElementById('visit-history-list').addEventListener('click', async e => {
+      const editBtn = e.target.closest('.history-edit');
+      const deleteBtn = e.target.closest('.history-delete');
+
+      if (editBtn) {
+        const index = Number(editBtn.dataset.index);
+        const item = window.UI.getVisitHistory()[index];
+        if (!item) return;
+        if (item.absent) window.UI.openAbsentModal(item, index);
+        else window.UI.openVisitModal(item, index);
+        return;
       }
-      document.getElementById('modal-absent').classList.add('hidden');
-      window.UI.toast('不在を記録しました');
+
+      if (deleteBtn) {
+        const index = Number(deleteBtn.dataset.index);
+        if (!await confirmDialog('この訪問履歴を削除しますか？')) return;
+        window.UI.deleteVisitHistoryItem(index);
+        syncLastVisitFromHistory();
+        autoSaveCurrentEntry();
+        window.UI.toast('訪問履歴を削除しました');
+      }
     });
 
     // ゴミ箱 復元
@@ -221,28 +244,51 @@
       }
     });
 
-    // 設定：タグ追加
-    document.getElementById('btn-add-tag').addEventListener('click', window.UI.openAddTagModal);
+    // 設定：タグ追加・編集
+    document.getElementById('btn-add-tag').addEventListener('click', () => window.UI.openAddTagModal());
     document.getElementById('btn-close-add-tag').addEventListener('click', window.UI.closeAddTagModal);
     document.querySelector('#modal-add-tag .modal-backdrop').addEventListener('click', window.UI.closeAddTagModal);
     document.getElementById('btn-save-tag').addEventListener('click', () => {
       const data = window.UI.getNewTagData();
       if (!data.name) { window.UI.toast('タグ名を入力してください'); return; }
-      window.DB.addTag(data);
+      const editingTagId = window.UI.getEditingTagId();
+      if (editingTagId) {
+        window.DB.updateTag(editingTagId, data);
+        window.UI.toast('タグを更新しました');
+      } else {
+        window.DB.addTag(data);
+        window.UI.toast('タグを追加しました');
+      }
       window.UI.closeAddTagModal();
       window.UI.renderTagsManage();
-      window.UI.toast('タグを追加しました');
+      window.UI.renderSettings();
+      renderList();
     });
 
-    // 設定：タグ削除
+    // 設定：タグ編集・削除
     document.getElementById('tags-list').addEventListener('click', async e => {
-      const btn = e.target.closest('.tag-manage-del');
-      if (btn) {
+      const editBtn = e.target.closest('.tag-manage-edit');
+      const delBtn = e.target.closest('.tag-manage-del');
+      const row = e.target.closest('.tag-manage-item');
+
+      if (editBtn) {
+        const tag = window.DB.getTags().find(t => t.id === editBtn.dataset.id);
+        if (tag) window.UI.openAddTagModal(tag);
+        return;
+      }
+
+      if (delBtn) {
         if (!await confirmDialog('このタグを削除しますか？')) return;
-        window.DB.deleteTag(btn.dataset.id);
+        window.DB.deleteTag(delBtn.dataset.id);
         window.UI.renderTagsManage();
         renderList();
         window.UI.toast('タグを削除しました');
+        return;
+      }
+
+      if (row) {
+        const tag = window.DB.getTags().find(t => t.id === row.dataset.id);
+        if (tag) window.UI.openAddTagModal(tag);
       }
     });
 
@@ -336,6 +382,37 @@
     renderList();
   }
 
+  function autoSaveCurrentEntry() {
+    const id = document.getElementById('field-id').value;
+    if (!id) return false;
+    const data = window.UI.getFormData();
+    if (!data.address) return false;
+    data.visitHistory = window.UI.getVisitHistory();
+    window.DB.updateVisit(id, data);
+    renderList();
+    return true;
+  }
+
+  function syncLastVisitFromHistory() {
+    const history = window.UI.getVisitHistory();
+    const valid = history.filter(item => item && item.date);
+    const lastVisitField = document.getElementById('field-last-visit');
+    document.querySelectorAll('#time-options .time-chip').forEach(c => c.classList.remove('selected'));
+
+    if (valid.length === 0) {
+      lastVisitField.value = '';
+      return;
+    }
+
+    const latest = valid.slice().sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+    lastVisitField.value = latest.date;
+
+    if (!latest.absent && latest.time) {
+      const chip = document.querySelector(`#time-options .time-chip[data-value="${latest.time}"]`);
+      if (chip) chip.classList.add('selected');
+    }
+  }
+
   function openMap(address) {
     const encoded = encodeURIComponent(address);
     window.open(`https://maps.google.com/?q=${encoded}`, '_blank');
@@ -371,7 +448,6 @@
         .catch(err => console.warn('Service Worker registration failed', err));
     });
   }
-
 
   // ===== 旧5件デモの整理 =====
   function migrateLegacyDemoData() {

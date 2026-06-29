@@ -10,7 +10,7 @@
   <title>訪問管理</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="css/style.css?v=20260627-6">
+  <link rel="stylesheet" href="css/style.css?v=20260629-1">
   <script>
     // ?debug=1 を付けた時だけ、iPhone Safari上にJSエラーを表示する
     (function () {
@@ -163,7 +163,7 @@
         </div>
       </div>
 
-      <button class="btn-primary" id="btn-save">保存</button>
+      <button class="btn-primary detail-save-btn" id="btn-save">保存</button>
     </div>
   </div>
 
@@ -230,12 +230,12 @@
     </div>
   </div>
 
-  <!-- タグ追加モーダル -->
+  <!-- タグ追加・編集モーダル -->
   <div id="modal-add-tag" class="modal hidden">
     <div class="modal-backdrop"></div>
     <div class="modal-sheet">
       <div class="modal-header">
-        <span class="modal-title">タグを追加</span>
+        <span class="modal-title" id="tag-modal-title">タグを追加</span>
         <button class="icon-btn" id="btn-close-add-tag" aria-label="閉じる">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -256,7 +256,7 @@
     <div class="modal-backdrop"></div>
     <div class="modal-sheet">
       <div class="modal-header">
-        <span class="modal-title">訪問を記録</span>
+        <span class="modal-title" id="visit-modal-title">訪問を記録</span>
         <button class="icon-btn" id="btn-close-visit" aria-label="閉じる">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -285,7 +285,7 @@
     <div class="modal-backdrop"></div>
     <div class="modal-sheet">
       <div class="modal-header">
-        <span class="modal-title">不在を記録</span>
+        <span class="modal-title" id="absent-modal-title">不在を記録</span>
         <button class="icon-btn" id="btn-close-absent" aria-label="閉じる">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -319,9 +319,9 @@
   <!-- トースト -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="js/db.js?v=20260627-6"></script>
-  <script src="js/tags.js?v=20260627-6"></script>
-  <script src="js/ui.js?v=20260627-6"></script>
-  <script src="js/app.js?v=20260627-6"></script>
+  <script src="js/db.js?v=20260629-1"></script>
+  <script src="js/tags.js?v=20260629-1"></script>
+  <script src="js/ui.js?v=20260629-1"></script>
+  <script src="js/app.js?v=20260629-1"></script>
 </body>
 </html>

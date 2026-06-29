@@ -17,6 +17,15 @@ window.UI = (() => {
     toastTimer = setTimeout(() => el.classList.add('hidden'), 2200);
   }
 
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   // ===== リストレンダリング =====
   function renderList(visits, tags, searchQuery, activeTagIds) {
     const container = document.getElementById('visit-list');
@@ -57,6 +66,16 @@ window.UI = (() => {
     filtered.forEach(v => {
       const days = window.daysSince(v.lastVisit);
       const isOverdue = days === null || days >= 14;
+      const row = document.createElement('div');
+      row.className = 'swipe-row';
+      row.dataset.id = v.id;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'swipe-delete-btn';
+      deleteBtn.dataset.id = v.id;
+      deleteBtn.type = 'button';
+      deleteBtn.textContent = '削除';
+
       const card = document.createElement('div');
       card.className = 'visit-card' + (isOverdue ? ' overdue' : '');
       card.dataset.id = v.id;
@@ -80,7 +99,7 @@ window.UI = (() => {
         v.tags.forEach(tid => {
           const tag = tagMap[tid];
           if (!tag) return;
-          tagsHtml += `<span class="tag-chip" style="background:${window.hexToRgba(tag.color,0.12)};color:${tag.color}">${tag.name}</span>`;
+          tagsHtml += `<span class="tag-chip" style="background:${window.hexToRgba(tag.color,0.12)};color:${tag.color}">${escapeHtml(tag.name)}</span>`;
         });
         tagsHtml += '</div>';
       }
@@ -91,20 +110,69 @@ window.UI = (() => {
 
       card.innerHTML = `
         <div class="card-top">
-          <span class="card-address">${v.address || '（住所未設定）'}</span>
+          <span class="card-address">${escapeHtml(v.address || '（住所未設定）')}</span>
           ${badgeHtml}
         </div>
-        <div class="card-name">${v.name || '不明'}${v.gender ? '・' + genderLabel(v.gender) : ''}</div>
+        <div class="card-name">${escapeHtml(v.name || '不明')}${v.gender ? '・' + genderLabel(v.gender) : ''}</div>
         ${tagsHtml}
         <div class="card-bottom">
-          <span class="card-date${isOverdue ? ' overdue' : ''}">${lastStr}</span>
+          <span class="card-date${isOverdue ? ' overdue' : ''}">${escapeHtml(lastStr)}</span>
           <button class="card-map-btn" data-address="${encodeURIComponent(v.address || '')}" aria-label="マップで開く">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
             マップ
           </button>
         </div>
       `;
-      container.appendChild(card);
+
+      row.appendChild(deleteBtn);
+      row.appendChild(card);
+      attachSwipeHandlers(row, card);
+      container.appendChild(row);
+    });
+  }
+
+  function attachSwipeHandlers(row, card) {
+    let startX = 0;
+    let startY = 0;
+    let currentX = 0;
+    let dragging = false;
+
+    card.addEventListener('touchstart', e => {
+      if (!e.touches || e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      currentX = 0;
+      dragging = false;
+      row.classList.add('dragging');
+    }, { passive: true });
+
+    card.addEventListener('touchmove', e => {
+      if (!e.touches || e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
+
+      dragging = true;
+      currentX = Math.max(-88, Math.min(0, dx));
+      if (currentX < 0) {
+        closeOpenSwipeRows(row);
+        card.style.transform = `translateX(${currentX}px)`;
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    card.addEventListener('touchend', () => {
+      row.classList.remove('dragging');
+      card.style.transform = '';
+      if (!dragging) return;
+      row.classList.toggle('swiped', currentX <= -48);
+      dragging = false;
+    });
+  }
+
+  function closeOpenSwipeRows(exceptRow) {
+    document.querySelectorAll('.swipe-row.swiped').forEach(row => {
+      if (row !== exceptRow) row.classList.remove('swiped');
     });
   }
 
@@ -129,7 +197,7 @@ window.UI = (() => {
       const card = document.createElement('div');
       card.className = 'trash-card';
       card.innerHTML = `
-        <div class="trash-card-address">${v.address || '（住所未設定）'}</div>
+        <div class="trash-card-address">${escapeHtml(v.address || '（住所未設定）')}</div>
         <div class="trash-card-bottom">
           <span class="trash-days">あと${remaining}日で完全削除</span>
           <button class="btn-restore" data-id="${v.id}">復元</button>
@@ -223,7 +291,7 @@ window.UI = (() => {
       item.innerHTML = `
         <div class="tag-picker-left">
           <div class="tag-color-dot" style="background:${tag.color}"></div>
-          <span>${tag.name}</span>
+          <span>${escapeHtml(tag.name)}</span>
         </div>
         <svg class="tag-check${isSelected ? ' visible' : ''}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       `;
@@ -242,21 +310,31 @@ window.UI = (() => {
 
   // ===== 訪問履歴 =====
   let visitHistory = [];
+  let editingHistoryIndex = null;
 
   function renderVisitHistory(history) {
     visitHistory = history.slice();
     const list = document.getElementById('visit-history-list');
     list.innerHTML = '';
-    const sorted = visitHistory.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
-    sorted.forEach(item => {
+    const sorted = visitHistory
+      .map((item, index) => ({ item, index }))
+      .sort((a, b) => new Date(b.item.date) - new Date(a.item.date));
+
+    sorted.forEach(({ item, index }) => {
       const el = document.createElement('div');
       el.className = 'history-item' + (item.absent ? ' absent' : '');
       el.innerHTML = `
-        <div class="history-item-top">
-          <span class="history-date">${item.absent ? '🚪 ' : ''}${window.formatDate(item.date)}</span>
-          <span class="history-time">${item.absent ? '不在' : window.timeLabel(item.time)}</span>
+        <div class="history-item-main">
+          <div class="history-item-top">
+            <span class="history-date">${item.absent ? '🚪 ' : ''}${window.formatDate(item.date)}</span>
+            <span class="history-time">${item.absent ? '不在' : window.timeLabel(item.time)}</span>
+          </div>
+          ${item.memo ? `<div class="history-memo">${escapeHtml(item.memo)}</div>` : ''}
         </div>
-        ${item.memo ? `<div class="history-memo">${item.memo}</div>` : ''}
+        <div class="history-actions">
+          <button type="button" class="history-action history-edit" data-index="${index}">編集</button>
+          <button type="button" class="history-action history-delete" data-index="${index}">削除</button>
+        </div>
       `;
       list.appendChild(el);
     });
@@ -264,16 +342,22 @@ window.UI = (() => {
 
   function getVisitHistory() { return visitHistory.slice(); }
 
-  function openVisitModal() {
+  function openVisitModal(item = null, index = null) {
+    editingHistoryIndex = Number.isInteger(index) ? index : null;
     const today = new Date().toISOString().slice(0, 10);
-    document.getElementById('visit-date').value = today;
-    document.querySelectorAll('#visit-time-options .time-chip').forEach(c => c.classList.remove('selected'));
-    document.getElementById('visit-memo').value = '';
+    document.getElementById('visit-modal-title').textContent = editingHistoryIndex === null ? '訪問を記録' : '訪問を編集';
+    document.getElementById('btn-save-visit').textContent = editingHistoryIndex === null ? '記録' : '更新';
+    document.getElementById('visit-date').value = item && item.date ? item.date : today;
+    document.querySelectorAll('#visit-time-options .time-chip').forEach(c => {
+      c.classList.toggle('selected', !!item && c.dataset.value === item.time);
+    });
+    document.getElementById('visit-memo').value = item && item.memo ? item.memo : '';
     document.getElementById('modal-visit').classList.remove('hidden');
   }
 
   function closeVisitModal() {
     document.getElementById('modal-visit').classList.add('hidden');
+    editingHistoryIndex = null;
   }
 
   function getVisitFormData() {
@@ -285,8 +369,39 @@ window.UI = (() => {
     };
   }
 
-  function addVisitToHistory(item) {
-    visitHistory.push(item);
+  function openAbsentModal(item = null, index = null) {
+    editingHistoryIndex = Number.isInteger(index) ? index : null;
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById('absent-modal-title').textContent = editingHistoryIndex === null ? '不在を記録' : '不在を編集';
+    document.getElementById('btn-save-absent').textContent = editingHistoryIndex === null ? '記録' : '更新';
+    document.getElementById('absent-date').value = item && item.date ? item.date : today;
+    document.getElementById('absent-memo').value = item && item.memo ? item.memo : '';
+    document.getElementById('modal-absent').classList.remove('hidden');
+  }
+
+  function closeAbsentModal() {
+    document.getElementById('modal-absent').classList.add('hidden');
+    editingHistoryIndex = null;
+  }
+
+  function getAbsentFormData() {
+    return {
+      date: document.getElementById('absent-date').value,
+      absent: true,
+      memo: document.getElementById('absent-memo').value.trim()
+    };
+  }
+
+  function saveVisitHistoryItem(item) {
+    const normalized = { ...item };
+    if (editingHistoryIndex === null) visitHistory.push(normalized);
+    else visitHistory[editingHistoryIndex] = normalized;
+    renderVisitHistory(visitHistory);
+  }
+
+  function deleteVisitHistoryItem(index) {
+    if (!Number.isInteger(index) || index < 0 || index >= visitHistory.length) return;
+    visitHistory.splice(index, 1);
     renderVisitHistory(visitHistory);
   }
 
@@ -305,25 +420,33 @@ window.UI = (() => {
     window.DB.getTags().forEach(tag => {
       const item = document.createElement('div');
       item.className = 'tag-manage-item';
+      item.dataset.id = tag.id;
       item.innerHTML = `
         <div class="tag-manage-left">
           <div class="tag-color-dot" style="background:${tag.color}"></div>
-          <span class="tag-manage-name">${tag.name}</span>
+          <span class="tag-manage-name">${escapeHtml(tag.name)}</span>
         </div>
-        <button class="tag-manage-del" data-id="${tag.id}" aria-label="削除">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+        <div class="tag-manage-actions">
+          <button type="button" class="tag-manage-edit" data-id="${tag.id}" aria-label="編集">編集</button>
+          <button class="tag-manage-del" data-id="${tag.id}" aria-label="削除">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
       `;
       list.appendChild(item);
     });
   }
 
-  // ===== タグ追加モーダル =====
+  // ===== タグ追加・編集モーダル =====
   let newTagColor = window.COLORS[0];
+  let editingTagId = null;
 
-  function openAddTagModal() {
-    newTagColor = window.COLORS[0];
-    document.getElementById('new-tag-name').value = '';
+  function openAddTagModal(tag = null) {
+    editingTagId = tag && tag.id ? tag.id : null;
+    newTagColor = tag && tag.color ? tag.color : window.COLORS[0];
+    document.getElementById('tag-modal-title').textContent = editingTagId ? 'タグを編集' : 'タグを追加';
+    document.getElementById('btn-save-tag').textContent = editingTagId ? '更新' : '追加';
+    document.getElementById('new-tag-name').value = tag && tag.name ? tag.name : '';
     window.renderColorPicker(
       document.getElementById('color-picker'),
       newTagColor,
@@ -334,6 +457,7 @@ window.UI = (() => {
 
   function closeAddTagModal() {
     document.getElementById('modal-add-tag').classList.add('hidden');
+    editingTagId = null;
   }
 
   function getNewTagData() {
@@ -342,6 +466,8 @@ window.UI = (() => {
       color: newTagColor
     };
   }
+
+  function getEditingTagId() { return editingTagId; }
 
   // ===== バックアップ通知 =====
   function updateBackupNotice() {
@@ -385,8 +511,9 @@ window.UI = (() => {
     renderSelectedTags, getSelectedTagIds,
     openTagPicker, closeTagPicker,
     renderVisitHistory, getVisitHistory, openVisitModal, closeVisitModal,
-    getVisitFormData, addVisitToHistory,
-    openAddTagModal, closeAddTagModal, getNewTagData,
+    getVisitFormData, openAbsentModal, closeAbsentModal, getAbsentFormData,
+    saveVisitHistoryItem, deleteVisitHistoryItem,
+    openAddTagModal, closeAddTagModal, getNewTagData, getEditingTagId,
     updateBackupNotice, renderFilterBar
   };
 })();
