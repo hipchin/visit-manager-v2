@@ -111,8 +111,8 @@
       const mapBtn = e.target.closest('.card-map-btn');
       if (mapBtn) {
         e.stopPropagation();
-        const addr = decodeURIComponent(mapBtn.dataset.address);
-        openMap(addr);
+        const addr = decodeURIComponent(mapBtn.dataset.address || '');
+        openMap(addr, mapBtn.dataset.lat, mapBtn.dataset.lng);
         return;
       }
       if (card) {
@@ -127,7 +127,10 @@
     // 保存
     document.getElementById('btn-save').addEventListener('click', () => {
       const data = window.UI.getFormData();
-      if (!data.address) { window.UI.toast('住所を入力してください'); return; }
+      if (!data.address && !data.displayTitle) {
+        window.UI.toast('場所・住所または一覧表示名を入力してください');
+        return;
+      }
       const id = document.getElementById('field-id').value;
       data.visitHistory = window.UI.getVisitHistory();
       if (id) {
@@ -153,9 +156,26 @@
 
     // 住所マップ（編集画面）
     document.getElementById('btn-map-preview').addEventListener('click', () => {
-      const addr = document.getElementById('field-address').value.trim();
-      if (!addr) { window.UI.toast('住所を入力してください'); return; }
-      openMap(addr);
+      const loc = window.UI.getLocationFields();
+      const addr = loc.address || loc.displayTitle;
+      if (!addr && (!Number.isFinite(loc.lat) || !Number.isFinite(loc.lng))) {
+        window.UI.toast('場所・住所を入力してください');
+        return;
+      }
+      openMap(addr, loc.lat, loc.lng);
+    });
+
+    // 現在地・地図ピッカー
+    document.getElementById('btn-use-current-location').addEventListener('click', window.UI.useCurrentLocation);
+    document.getElementById('btn-open-location-picker').addEventListener('click', window.UI.openLocationPicker);
+    document.getElementById('btn-close-location-picker').addEventListener('click', window.UI.closeLocationPicker);
+    document.querySelector('#modal-location-picker .modal-backdrop').addEventListener('click', window.UI.closeLocationPicker);
+    document.getElementById('btn-location-current').addEventListener('click', window.UI.movePickerToCurrentLocation);
+    document.getElementById('btn-use-picked-location').addEventListener('click', window.UI.usePickedLocation);
+
+    // 住所を手入力した場合は、既存座標とズレる可能性があるため座標を消す
+    document.getElementById('field-address').addEventListener('input', () => {
+      window.UI.clearLocationCoordinates();
     });
 
     // 時間帯チップ（メインフォーム）
@@ -386,7 +406,7 @@
     const id = document.getElementById('field-id').value;
     if (!id) return false;
     const data = window.UI.getFormData();
-    if (!data.address) return false;
+    if (!data.address && !data.displayTitle) return false;
     data.visitHistory = window.UI.getVisitHistory();
     window.DB.updateVisit(id, data);
     renderList();
@@ -413,8 +433,20 @@
     }
   }
 
-  function openMap(address) {
-    const encoded = encodeURIComponent(address);
+  function openMap(address, lat, lng) {
+    const latNum = Number(lat);
+    const lngNum = Number(lng);
+    if (Number.isFinite(latNum) && Number.isFinite(lngNum)) {
+      window.open(`https://maps.google.com/?q=${encodeURIComponent(latNum + ',' + lngNum)}`, '_blank');
+      return;
+    }
+
+    const addr = String(address || '').trim();
+    if (!addr) {
+      window.UI.toast('マップで開ける場所がありません');
+      return;
+    }
+    const encoded = encodeURIComponent(addr);
     window.open(`https://maps.google.com/?q=${encoded}`, '_blank');
   }
 
@@ -477,7 +509,12 @@
     const lastVisit = d.toISOString().slice(0, 10);
 
     window.DB.addVisit({
-      address: '【サンプル】横浜市鶴見区〇〇町1-2-3',
+      address: '【サンプル】横浜市鶴見区〇〇町1-2-3付近',
+      displayTitle: '【サンプル】白い門の家',
+      placeMemo: '角の家、犬あり。削除可。',
+      lat: null,
+      lng: null,
+      locationSource: '',
       name: 'サンプル訪問先（削除可）',
       gender: '',
       lastVisit,

@@ -11,7 +11,7 @@ window.DB = (() => {
     version: 'vm_version'
   };
 
-  const APP_VERSION = '1.0.6';
+  const APP_VERSION = '1.0.7';
 
   function load(key, fallback) {
     try {
@@ -32,9 +32,27 @@ window.DB = (() => {
     }
   }
 
-  // visits
   function asArray(value, fallback = []) {
     return Array.isArray(value) ? value : fallback;
+  }
+
+  function normalizeVisit(entry) {
+    const normalized = entry && typeof entry === 'object' ? { ...entry } : {};
+
+    if (normalized.displayTitle == null) normalized.displayTitle = '';
+    if (normalized.placeMemo == null) normalized.placeMemo = '';
+    if (normalized.locationSource == null) normalized.locationSource = '';
+
+    const lat = Number(normalized.lat);
+    const lng = Number(normalized.lng);
+    normalized.lat = Number.isFinite(lat) ? lat : null;
+    normalized.lng = Number.isFinite(lng) ? lng : null;
+
+    return normalized;
+  }
+
+  function normalizeVisits(value) {
+    return asArray(value).map(normalizeVisit);
   }
 
   function normalizeTags(value) {
@@ -46,24 +64,25 @@ window.DB = (() => {
     return Array.isArray(value) ? value : fallback;
   }
 
-  function getVisits() { return asArray(load(KEYS.visits, [])); }
-  function saveVisits(visits) { save(KEYS.visits, asArray(visits)); }
+  function getVisits() { return normalizeVisits(load(KEYS.visits, [])); }
+  function saveVisits(visits) { save(KEYS.visits, normalizeVisits(visits)); }
 
   function addVisit(entry) {
     const visits = getVisits();
-    entry.id = entry.id || Date.now().toString(36) + Math.random().toString(36).slice(2);
-    entry.createdAt = entry.createdAt || new Date().toISOString();
-    entry.updatedAt = new Date().toISOString();
-    visits.push(entry);
+    const normalized = normalizeVisit(entry);
+    normalized.id = normalized.id || Date.now().toString(36) + Math.random().toString(36).slice(2);
+    normalized.createdAt = normalized.createdAt || new Date().toISOString();
+    normalized.updatedAt = new Date().toISOString();
+    visits.push(normalized);
     saveVisits(visits);
-    return entry;
+    return normalized;
   }
 
   function updateVisit(id, patch) {
     const visits = getVisits();
     const idx = visits.findIndex(v => v.id === id);
     if (idx === -1) return null;
-    visits[idx] = { ...visits[idx], ...patch, updatedAt: new Date().toISOString() };
+    visits[idx] = normalizeVisit({ ...visits[idx], ...patch, updatedAt: new Date().toISOString() });
     saveVisits(visits);
     return visits[idx];
   }
@@ -73,8 +92,8 @@ window.DB = (() => {
   }
 
   // trash
-  function getTrash() { return asArray(load(KEYS.trash, [])); }
-  function saveTrash(trash) { save(KEYS.trash, asArray(trash)); }
+  function getTrash() { return normalizeVisits(load(KEYS.trash, [])); }
+  function saveTrash(trash) { save(KEYS.trash, normalizeVisits(trash)); }
 
   function moveToTrash(id) {
     const visits = getVisits();

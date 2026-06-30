@@ -1,7 +1,7 @@
 // sw.js — 更新優先のService Worker
 // 旧キャッシュを削除し、通常の通信はネットワークへ流す。
 
-const CACHE_VERSION = 'visit-manager-v20260629-2';
+const CACHE_VERSION = 'visit-manager-v20260630-location1';
 
 self.addEventListener('install', event => {
   self.skipWaiting();

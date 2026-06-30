@@ -78,7 +78,6 @@ function timeLabel(value) {
   return { morning:'午前', afternoon:'午後', evening:'夕方', night:'夜' }[value] || '';
 }
 
-
 // Safari/PWAでグローバルconstの初期化順に引っかからないよう、明示的にwindowへ公開する
 window.hexToRgba = hexToRgba;
 window.renderTagChip = renderTagChip;

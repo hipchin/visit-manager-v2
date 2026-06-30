@@ -26,6 +26,19 @@ window.UI = (() => {
       .replace(/'/g, '&#039;');
   }
 
+  function toNumberOrNull(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function hasLatLng(entry) {
+    return Number.isFinite(Number(entry && entry.lat)) && Number.isFinite(Number(entry && entry.lng));
+  }
+
+  function entryTitle(entry) {
+    return (entry.displayTitle || '').trim() || (entry.address || '').trim() || '場所未設定';
+  }
+
   // ===== リストレンダリング =====
   function renderList(visits, tags, searchQuery, activeTagIds) {
     const container = document.getElementById('visit-list');
@@ -36,8 +49,11 @@ window.UI = (() => {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(v =>
+        (v.displayTitle || '').toLowerCase().includes(q) ||
         (v.address || '').toLowerCase().includes(q) ||
-        (v.name || '').toLowerCase().includes(q)
+        (v.name || '').toLowerCase().includes(q) ||
+        (v.placeMemo || '').toLowerCase().includes(q) ||
+        (v.memo || '').toLowerCase().includes(q)
       );
     }
 
@@ -80,7 +96,6 @@ window.UI = (() => {
       card.className = 'visit-card' + (isOverdue ? ' overdue' : '');
       card.dataset.id = v.id;
 
-      // バッジ
       let badgeHtml = '';
       if (days === null) {
         badgeHtml = `<span class="badge badge-warn">未訪問</span>`;
@@ -92,7 +107,6 @@ window.UI = (() => {
         badgeHtml = `<span class="badge badge-neutral">${days}日前</span>`;
       }
 
-      // タグ
       let tagsHtml = '';
       if (v.tags && v.tags.length > 0) {
         tagsHtml = '<div class="card-tags">';
@@ -108,16 +122,22 @@ window.UI = (() => {
         ? `最終訪問 ${window.formatDate(v.lastVisit)}${v.lastTime ? '（' + window.timeLabel(v.lastTime) + '）' : ''}`
         : '未訪問';
 
+      const title = entryTitle(v);
+      const placeMemoHtml = v.placeMemo ? `<div class="card-place-memo">${escapeHtml(v.placeMemo)}</div>` : '';
+      const lat = hasLatLng(v) ? String(v.lat) : '';
+      const lng = hasLatLng(v) ? String(v.lng) : '';
+
       card.innerHTML = `
         <div class="card-top">
-          <span class="card-address">${escapeHtml(v.address || '（住所未設定）')}</span>
+          <span class="card-address">${escapeHtml(title)}</span>
           ${badgeHtml}
         </div>
         <div class="card-name">${escapeHtml(v.name || '不明')}${v.gender ? '・' + genderLabel(v.gender) : ''}</div>
+        ${placeMemoHtml}
         ${tagsHtml}
         <div class="card-bottom">
           <span class="card-date${isOverdue ? ' overdue' : ''}">${escapeHtml(lastStr)}</span>
-          <button class="card-map-btn" data-address="${encodeURIComponent(v.address || '')}" aria-label="マップで開く">
+          <button class="card-map-btn" data-address="${encodeURIComponent(v.address || title || '')}" data-lat="${escapeHtml(lat)}" data-lng="${escapeHtml(lng)}" aria-label="マップで開く">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
             マップ
           </button>
@@ -197,7 +217,7 @@ window.UI = (() => {
       const card = document.createElement('div');
       card.className = 'trash-card';
       card.innerHTML = `
-        <div class="trash-card-address">${escapeHtml(v.address || '（住所未設定）')}</div>
+        <div class="trash-card-address">${escapeHtml(entryTitle(v))}</div>
         <div class="trash-card-bottom">
           <span class="trash-days">あと${remaining}日で完全削除</span>
           <button class="btn-restore" data-id="${v.id}">復元</button>
@@ -211,20 +231,23 @@ window.UI = (() => {
   function fillForm(entry) {
     document.getElementById('field-id').value = entry.id || '';
     document.getElementById('field-address').value = entry.address || '';
+    document.getElementById('field-display-title').value = entry.displayTitle || '';
+    document.getElementById('field-place-memo').value = entry.placeMemo || '';
+    document.getElementById('field-lat').value = hasLatLng(entry) ? String(entry.lat) : '';
+    document.getElementById('field-lng').value = hasLatLng(entry) ? String(entry.lng) : '';
+    document.getElementById('field-location-source').value = entry.locationSource || '';
+    updateLocationStatus();
+
     document.getElementById('field-name').value = entry.name || '';
     document.getElementById('field-gender').value = entry.gender || '';
     document.getElementById('field-last-visit').value = entry.lastVisit || '';
     document.getElementById('field-memo').value = entry.memo || '';
 
-    // 時間帯チップ
     document.querySelectorAll('#time-options .time-chip').forEach(chip => {
       chip.classList.toggle('selected', chip.dataset.value === entry.lastTime);
     });
 
-    // タグ
     renderSelectedTags(entry.tags || []);
-
-    // 訪問履歴
     renderVisitHistory(entry.visitHistory || []);
 
     const isEdit = !!entry.id;
@@ -237,6 +260,11 @@ window.UI = (() => {
     const selectedTime = document.querySelector('#time-options .time-chip.selected');
     return {
       address: document.getElementById('field-address').value.trim(),
+      displayTitle: document.getElementById('field-display-title').value.trim(),
+      placeMemo: document.getElementById('field-place-memo').value.trim(),
+      lat: toNumberOrNull(document.getElementById('field-lat').value),
+      lng: toNumberOrNull(document.getElementById('field-lng').value),
+      locationSource: document.getElementById('field-location-source').value,
       name: document.getElementById('field-name').value.trim(),
       gender: document.getElementById('field-gender').value,
       lastVisit: document.getElementById('field-last-visit').value,
@@ -244,6 +272,264 @@ window.UI = (() => {
       memo: document.getElementById('field-memo').value.trim(),
       tags: getSelectedTagIds()
     };
+  }
+
+  // ===== 位置情報 =====
+  function getLocationFields() {
+    return {
+      address: document.getElementById('field-address').value.trim(),
+      displayTitle: document.getElementById('field-display-title').value.trim(),
+      lat: toNumberOrNull(document.getElementById('field-lat').value),
+      lng: toNumberOrNull(document.getElementById('field-lng').value),
+      locationSource: document.getElementById('field-location-source').value
+    };
+  }
+
+  function setLocationFields({ address, lat, lng, source, fillDisplayTitle = true }) {
+    const addressField = document.getElementById('field-address');
+    const titleField = document.getElementById('field-display-title');
+
+    if (typeof address === 'string' && address.trim()) {
+      addressField.value = address.trim();
+      if (fillDisplayTitle && !titleField.value.trim()) {
+        titleField.value = address.trim();
+      }
+    }
+
+    document.getElementById('field-lat').value = Number.isFinite(Number(lat)) ? String(Number(lat)) : '';
+    document.getElementById('field-lng').value = Number.isFinite(Number(lng)) ? String(Number(lng)) : '';
+    document.getElementById('field-location-source').value = source || '';
+    updateLocationStatus();
+  }
+
+  function clearLocationCoordinates() {
+    document.getElementById('field-lat').value = '';
+    document.getElementById('field-lng').value = '';
+    document.getElementById('field-location-source').value = '';
+    updateLocationStatus();
+  }
+
+  function updateLocationStatus(message = '') {
+    const el = document.getElementById('location-status');
+    if (!el) return;
+    el.classList.remove('has-location', 'warn');
+
+    if (message) {
+      el.textContent = message;
+      if (message.includes('失敗') || message.includes('手入力')) el.classList.add('warn');
+      return;
+    }
+
+    const loc = getLocationFields();
+    if (Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) {
+      el.textContent = '座標を保存済みです。ナビは座標を優先して開きます。';
+      el.classList.add('has-location');
+      return;
+    }
+
+    el.textContent = '住所を入力するか、現在地・地図から場所候補を取得できます。';
+  }
+
+  function currentPosition(options = {}) {
+    return new Promise((resolve, reject) => {
+      if (!('geolocation' in navigator)) {
+        reject(new Error('この端末では位置情報を取得できません'));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: options.timeout || 15000,
+        maximumAge: 0
+      });
+    });
+  }
+
+  async function reverseGeocode(lat, lng) {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1&accept-language=ja`;
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error('住所候補を取得できませんでした');
+    const data = await res.json();
+    const readable = buildReadableAddress(data);
+    if (!readable) throw new Error('住所候補が空でした');
+    return readable;
+  }
+
+  function buildReadableAddress(data) {
+    if (!data) return '';
+    const a = data.address || {};
+    const parts = [
+      a.province || a.state,
+      a.city || a.town || a.village || a.municipality,
+      a.city_district || a.borough || a.ward || a.suburb,
+      a.neighbourhood || a.quarter,
+      a.road,
+      a.house_number
+    ].filter(Boolean);
+
+    const uniqueParts = [];
+    parts.forEach(part => {
+      if (!uniqueParts.includes(part)) uniqueParts.push(part);
+    });
+
+    if (uniqueParts.length >= 2) return uniqueParts.join('');
+    if (data.display_name) return String(data.display_name).split(',').slice(0, 5).map(s => s.trim()).join(' ');
+    return '';
+  }
+
+  async function useCurrentLocation() {
+    try {
+      updateLocationStatus('現在地を取得しています。');
+      const pos = await currentPosition();
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      updateLocationStatus('住所候補を取得しています。');
+      let address = '';
+      try {
+        address = await reverseGeocode(lat, lng);
+      } catch (err) {
+        console.warn('reverse geocode failed', err);
+      }
+
+      if (address) {
+        setLocationFields({ address, lat, lng, source: 'current' });
+        toast('現在地から場所を入力しました');
+      } else {
+        setLocationFields({ lat, lng, source: 'current', fillDisplayTitle: false });
+        updateLocationStatus('座標は保存しました。住所候補の取得に失敗したため、場所・住所を手入力してください。');
+        toast('座標を保存しました');
+      }
+    } catch (err) {
+      console.warn('geolocation failed', err);
+      updateLocationStatus('現在地の取得に失敗しました。位置情報の許可を確認してください。');
+      toast('現在地を取得できませんでした');
+    }
+  }
+
+  // ===== 地図ピッカー =====
+  let locationMap = null;
+  let locationMarker = null;
+  let pickedLocation = null;
+  let pickedAddress = '';
+  let reverseRequestId = 0;
+
+  function openLocationPicker() {
+    const modal = document.getElementById('modal-location-picker');
+    modal.classList.remove('hidden');
+
+    if (!window.L) {
+      document.getElementById('location-picker-status').textContent = '地図ライブラリを読み込めませんでした。通信状況を確認してください。';
+      return;
+    }
+
+    const loc = getLocationFields();
+    const startLat = Number.isFinite(loc.lat) ? loc.lat : 35.5086;
+    const startLng = Number.isFinite(loc.lng) ? loc.lng : 139.6824;
+    pickedLocation = { lat: startLat, lng: startLng };
+    pickedAddress = loc.address || '';
+
+    setTimeout(() => {
+      ensureLocationMap(startLat, startLng);
+      setPickedLocation(startLat, startLng, false);
+      if (locationMap) locationMap.invalidateSize();
+    }, 80);
+  }
+
+  function closeLocationPicker() {
+    document.getElementById('modal-location-picker').classList.add('hidden');
+  }
+
+  function ensureLocationMap(lat, lng) {
+    if (locationMap) {
+      locationMap.setView([lat, lng], 17);
+      return;
+    }
+
+    locationMap = window.L.map('location-map', {
+      zoomControl: true,
+      attributionControl: true
+    }).setView([lat, lng], 17);
+
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(locationMap);
+
+    locationMarker = window.L.marker([lat, lng], { draggable: true }).addTo(locationMap);
+
+    locationMap.on('click', e => {
+      setPickedLocation(e.latlng.lat, e.latlng.lng, true);
+    });
+
+    locationMarker.on('dragend', () => {
+      const ll = locationMarker.getLatLng();
+      setPickedLocation(ll.lat, ll.lng, true);
+    });
+  }
+
+  function setPickedLocation(lat, lng, shouldReverse) {
+    pickedLocation = { lat, lng };
+    if (locationMarker) locationMarker.setLatLng([lat, lng]);
+    if (locationMap) locationMap.setView([lat, lng], locationMap.getZoom() || 17);
+
+    const status = document.getElementById('location-picker-status');
+    if (!shouldReverse) {
+      status.textContent = pickedAddress || '地図をタップして場所を選んでください。';
+      return;
+    }
+
+    const requestId = ++reverseRequestId;
+    pickedAddress = '';
+    status.textContent = '住所候補を取得しています。';
+
+    reverseGeocode(lat, lng)
+      .then(address => {
+        if (requestId !== reverseRequestId) return;
+        pickedAddress = address;
+        status.textContent = `住所候補：${address}`;
+      })
+      .catch(err => {
+        if (requestId !== reverseRequestId) return;
+        console.warn('picker reverse geocode failed', err);
+        status.textContent = '住所候補を取得できませんでした。この場所を使う場合は、保存後に場所・住所を手入力してください。';
+      });
+  }
+
+  async function movePickerToCurrentLocation() {
+    try {
+      const status = document.getElementById('location-picker-status');
+      status.textContent = '現在地を取得しています。';
+      const pos = await currentPosition();
+      setPickedLocation(pos.coords.latitude, pos.coords.longitude, true);
+    } catch (err) {
+      console.warn('picker geolocation failed', err);
+      toast('現在地を取得できませんでした');
+    }
+  }
+
+  async function usePickedLocation() {
+    if (!pickedLocation) {
+      toast('地図で場所を選んでください');
+      return;
+    }
+
+    let address = pickedAddress;
+    if (!address) {
+      try {
+        address = await reverseGeocode(pickedLocation.lat, pickedLocation.lng);
+      } catch (err) {
+        console.warn('use picked reverse geocode failed', err);
+      }
+    }
+
+    if (address) {
+      setLocationFields({ address, lat: pickedLocation.lat, lng: pickedLocation.lng, source: 'pin' });
+      toast('地図から場所を入力しました');
+    } else {
+      setLocationFields({ lat: pickedLocation.lat, lng: pickedLocation.lng, source: 'pin', fillDisplayTitle: false });
+      updateLocationStatus('座標は保存しました。住所候補の取得に失敗したため、場所・住所を手入力してください。');
+      toast('座標を保存しました');
+    }
+    closeLocationPicker();
   }
 
   // ===== タグ選択UI =====
@@ -530,6 +816,8 @@ window.UI = (() => {
     showScreen, toast,
     renderList, renderTrash, renderSettings, renderTagsManage,
     fillForm, getFormData,
+    getLocationFields, setLocationFields, clearLocationCoordinates, updateLocationStatus,
+    useCurrentLocation, openLocationPicker, closeLocationPicker, movePickerToCurrentLocation, usePickedLocation,
     renderSelectedTags, getSelectedTagIds,
     openTagPicker, closeTagPicker,
     renderVisitHistory, getVisitHistory, openVisitModal, closeVisitModal,

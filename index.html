@@ -10,7 +10,8 @@
   <title>訪問管理</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="css/style.css?v=20260629-2">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="css/style.css?v=20260630-location1">
   <script>
     // ?debug=1 を付けた時だけ、iPhone Safari上にJSエラーを表示する
     (function () {
@@ -67,7 +68,7 @@
     </div>
 
     <div class="search-wrap">
-      <input type="search" id="search-input" class="search-input" placeholder="住所・名前で検索">
+      <input type="search" id="search-input" class="search-input" placeholder="場所・住所・名前・メモで検索">
     </div>
 
     <div class="backup-notice hidden" id="backup-notice">
@@ -98,15 +99,33 @@
 
     <div class="form-container">
       <input type="hidden" id="field-id">
+      <input type="hidden" id="field-lat">
+      <input type="hidden" id="field-lng">
+      <input type="hidden" id="field-location-source">
 
       <div class="form-section">
-        <label class="form-label">住所 <span class="required">*</span></label>
+        <label class="form-label">場所・住所 <span class="required">*</span></label>
         <div class="address-row">
-          <input type="text" id="field-address" class="form-input" placeholder="横浜市鶴見区〇〇町1-2-3">
-          <button class="map-inline-btn" id="btn-map-preview" aria-label="マップで確認">
+          <input type="text" id="field-address" class="form-input" placeholder="横浜市鶴見区〇〇町1-2付近">
+          <button class="map-inline-btn" id="btn-map-preview" aria-label="マップで確認" type="button">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
           </button>
         </div>
+        <div class="location-actions">
+          <button class="location-action-btn" id="btn-use-current-location" type="button">現在地から入力</button>
+          <button class="location-action-btn" id="btn-open-location-picker" type="button">地図で選ぶ</button>
+        </div>
+        <p class="location-status" id="location-status">住所を入力するか、現在地・地図から場所候補を取得できます。</p>
+      </div>
+
+      <div class="form-section">
+        <label class="form-label">一覧表示名</label>
+        <input type="text" id="field-display-title" class="form-input" placeholder="空欄なら場所・住所を表示">
+      </div>
+
+      <div class="form-section">
+        <label class="form-label">場所メモ</label>
+        <textarea id="field-place-memo" class="form-textarea" placeholder="白い門、角の家、犬あり、公園向かいなど" rows="3"></textarea>
       </div>
 
       <div class="form-row">
@@ -128,10 +147,10 @@
       <div class="form-section">
         <label class="form-label">会えた時間帯</label>
         <div class="time-options" id="time-options">
-          <button class="time-chip" data-value="morning">午前</button>
-          <button class="time-chip" data-value="afternoon">午後</button>
-          <button class="time-chip" data-value="evening">夕方</button>
-          <button class="time-chip" data-value="night">夜</button>
+          <button class="time-chip" data-value="morning" type="button">午前</button>
+          <button class="time-chip" data-value="afternoon" type="button">午後</button>
+          <button class="time-chip" data-value="evening" type="button">夕方</button>
+          <button class="time-chip" data-value="night" type="button">夜</button>
         </div>
       </div>
 
@@ -266,10 +285,10 @@
         <input type="date" id="visit-date" class="form-input">
         <label class="form-label" style="margin-top:12px;">時間帯</label>
         <div class="time-options" id="visit-time-options">
-          <button class="time-chip" data-value="morning">午前</button>
-          <button class="time-chip" data-value="afternoon">午後</button>
-          <button class="time-chip" data-value="evening">夕方</button>
-          <button class="time-chip" data-value="night">夜</button>
+          <button class="time-chip" data-value="morning" type="button">午前</button>
+          <button class="time-chip" data-value="afternoon" type="button">午後</button>
+          <button class="time-chip" data-value="evening" type="button">夕方</button>
+          <button class="time-chip" data-value="night" type="button">夜</button>
         </div>
         <label class="form-label" style="margin-top:12px;">メモ</label>
         <textarea id="visit-memo" class="form-textarea" rows="3" placeholder="会話内容など"></textarea>
@@ -302,6 +321,27 @@
     </div>
   </div>
 
+  <!-- 場所選択モーダル -->
+  <div id="modal-location-picker" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-sheet location-picker-sheet">
+      <div class="modal-header">
+        <span class="modal-title">地図で場所を選択</span>
+        <button class="icon-btn" id="btn-close-location-picker" aria-label="閉じる">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="location-map" class="location-map"></div>
+        <p class="location-picker-note" id="location-picker-status">地図をタップして場所を選んでください。</p>
+        <button class="btn-secondary" id="btn-location-current" type="button">現在地へ移動</button>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" id="btn-use-picked-location" type="button">この場所を使う</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 確認ダイアログ -->
   <div id="modal-confirm" class="modal hidden">
     <div class="modal-backdrop"></div>
@@ -319,9 +359,10 @@
   <!-- トースト -->
   <div id="toast" class="toast hidden"></div>
 
-  <script src="js/db.js?v=20260629-2"></script>
-  <script src="js/tags.js?v=20260629-2"></script>
-  <script src="js/ui.js?v=20260629-2"></script>
-  <script src="js/app.js?v=20260629-2"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/db.js?v=20260630-location1"></script>
+  <script src="js/tags.js?v=20260630-location1"></script>
+  <script src="js/ui.js?v=20260630-location1"></script>
+  <script src="js/app.js?v=20260630-location1"></script>
 </body>
 </html>
