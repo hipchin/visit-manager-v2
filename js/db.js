@@ -11,7 +11,7 @@ window.DB = (() => {
     version: 'vm_version'
   };
 
-  const APP_VERSION = '1.0.8';
+  const APP_VERSION = '1.0.9';
 
   function load(key, fallback) {
     try {

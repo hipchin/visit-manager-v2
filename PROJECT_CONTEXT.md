@@ -518,7 +518,8 @@ Service Worker方針:
 - 旧キャッシュを削除する
 - 通常通信はネットワークを優先する
 - `CACHE_VERSION` を更新時に変える
-- `skipWaiting()` と `clients.claim()` を使う
+- `clients.claim()` を使う
+- 更新時の `skipWaiting()` は、アプリ側の「更新して再起動」操作から送る
 
 更新時の注意点:
 
@@ -539,11 +540,12 @@ Service Worker方針:
 - READMEの反映手順
 - CHANGELOGの日付
 
-今回の起動高速化版:
+今回の起動高速化・PWA更新改善版:
 
-- 読み込みクエリ: `20260709-speed1`
-- Service Workerキャッシュ識別子: `visit-manager-v20260709-speed1`
-- アプリ内部バージョン: `1.0.8`
+- 読み込みクエリ: `20260709-update1`
+- Service Workerキャッシュ識別子: `visit-manager-v20260709-update1`
+- アプリ内部バージョン: `1.0.9`
+- バージョン確認ファイル: `version.json`
 
 ---
 
@@ -616,6 +618,37 @@ Service Worker方針:
 3. ローカルで全ファイルを確認する
 4. 修正ZIPを作成する
 5. ユーザーがGitHubへアップロードする
+
+---
+
+## PWA更新改善設計 20260709-update1
+
+目的:
+
+- iPhone Safari / ホーム画面追加PWAで、設定画面の更新ボタンだけに依存しない
+- タスクキルしないと最新版に切り替わらない状況を減らす
+- ユーザーには「最新版があります」→「更新して再起動」という分かりやすい操作にする
+
+追加ファイル:
+
+- `version.json`
+
+主な仕様:
+
+- `js/app.js` に `APP_BUILD_ID = '20260709-update1'` を定義
+- 起動後の遅延処理で `version.json` を `cache: 'no-store'` で取得
+- `version.json` の `buildId` と `APP_BUILD_ID` が異なる場合、更新通知を表示
+- Service Workerに `waiting` がある場合は `SKIP_WAITING` を送信
+- `controllerchange` を検知したら、`?v=<buildId>&reload=<timestamp>` 付きで再読み込み
+- Service Worker更新がうまく検知されない場合でも、最終的にバージョン付きURLへ遷移する
+- 設定画面の「アプリを更新」は残すが、主導線ではなく保険として扱う
+
+重要:
+
+- localStorageキーは変更しない
+- 保存済み訪問データには触れない
+- 更新通知はアプリコードの更新だけを扱い、個人データの移行は行わない
+- `version.json` の `buildId`、`index.html` の読み込みクエリ、`sw.js` の `CACHE_VERSION`、`db.js` の `APP_VERSION` は更新時に整合させる
 
 ---
 

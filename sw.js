@@ -1,10 +1,12 @@
 // sw.js — 更新優先のService Worker
 // 旧キャッシュを削除し、通常の通信はネットワークへ流す。
+// 新版が見つかった場合は、アプリ側の通知から SKIP_WAITING を送って反映する。
 
-const CACHE_VERSION = 'visit-manager-v20260709-speed1';
+const CACHE_VERSION = 'visit-manager-v20260709-update1';
 
 self.addEventListener('install', event => {
-  self.skipWaiting();
+  // 初回インストールは通常通り完了させる。
+  // 更新時はアプリ側で「更新して再起動」を押した時だけ skipWaiting する。
 });
 
 self.addEventListener('activate', event => {

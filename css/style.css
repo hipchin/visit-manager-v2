@@ -717,3 +717,43 @@ html, body {
   transition: opacity 0.3s;
 }
 .toast.hidden { opacity: 0; }
+
+/* ===== app update notice ===== */
+.app-update-notice {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(10px);
+}
+
+.app-update-notice.hidden {
+  display: none;
+}
+
+.app-update-notice-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.app-update-notice-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 14px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}

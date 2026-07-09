@@ -8,6 +8,7 @@
   const LIST_INITIAL_LIMIT = 50;
   const LIST_MORE_LIMIT = 50;
   const TRASH_PURGE_KEY = 'vm_last_trash_purge';
+  const APP_BUILD_ID = '20260709-update1';
 
   // ===== 初期化 =====
   function init() {
@@ -43,7 +44,8 @@
     // 起動直後の白画面を避けるため、表示に不要な処理は後回しにする。
     runLater(updateBackupNoticeLater, 300);
     runLater(purgeTrashOncePerDay, 900);
-    runLater(snapshotToIndexedDBLater, 1600);
+    runLater(checkForAppUpdateLater, 1200);
+    runLater(snapshotToIndexedDBLater, 1800);
   }
 
   function updateBackupNoticeLater() {
@@ -52,6 +54,10 @@
 
   function snapshotToIndexedDBLater() {
     window.DB.snapshotToIndexedDB();
+  }
+
+  function checkForAppUpdateLater() {
+    checkForAppUpdate(false);
   }
 
   function purgeTrashOncePerDay() {
@@ -617,22 +623,7 @@
 
     // 手動アップデート
     document.getElementById('btn-update').addEventListener('click', () => {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistration().then(reg => {
-          if (reg) {
-            reg.update().then(() => {
-              if (reg.waiting) {
-                reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                window.location.reload();
-              } else {
-                window.UI.toast('すでに最新バージョンです');
-              }
-            });
-          } else {
-            window.UI.toast('Service Workerが見つかりません');
-          }
-        });
-      }
+      triggerAppUpdate(true);
     });
 
     // 検索
@@ -735,15 +726,152 @@
     });
   }
 
-  // ===== Service Worker =====
+  // ===== Service Worker / アプリ更新 =====
+  let updateReloading = false;
+  let pendingUpdateBuildId = '';
+
   function registerSW() {
     if (!('serviceWorker' in navigator)) return;
 
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (updateReloading) return;
+      updateReloading = true;
+      reloadWithBuildParam(pendingUpdateBuildId || APP_BUILD_ID);
+    });
+
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
-        .then(reg => reg.update())
+        .then(reg => {
+          watchServiceWorkerUpdate(reg);
+          return reg.update();
+        })
         .catch(err => console.warn('Service Worker registration failed', err));
     });
+  }
+
+  function watchServiceWorkerUpdate(reg) {
+    if (!reg) return;
+
+    if (reg.waiting && navigator.serviceWorker.controller) {
+      showAppUpdateNotice(reg, APP_BUILD_ID);
+    }
+
+    reg.addEventListener('updatefound', () => {
+      const worker = reg.installing;
+      if (!worker) return;
+      worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+          showAppUpdateNotice(reg, APP_BUILD_ID);
+        }
+      });
+    });
+  }
+
+  async function checkForAppUpdate(manual) {
+    try {
+      const res = await fetch('./version.json?ts=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) {
+        if (manual) window.UI.toast('バージョン確認に失敗しました');
+        return;
+      }
+
+      const data = await res.json();
+      const latestBuildId = data && data.buildId ? String(data.buildId) : '';
+      if (!latestBuildId) {
+        if (manual) window.UI.toast('バージョン情報が空です');
+        return;
+      }
+
+      if (latestBuildId !== APP_BUILD_ID) {
+        const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
+        showAppUpdateNotice(reg, latestBuildId);
+        return;
+      }
+
+      if (manual) window.UI.toast('すでに最新バージョンです');
+    } catch (err) {
+      console.warn('app update check failed', err);
+      if (manual) window.UI.toast('更新確認に失敗しました');
+    }
+  }
+
+  async function triggerAppUpdate(manual) {
+    pendingUpdateBuildId = pendingUpdateBuildId || APP_BUILD_ID;
+
+    try {
+      if (!('serviceWorker' in navigator)) {
+        reloadWithBuildParam(pendingUpdateBuildId);
+        return;
+      }
+
+      let reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) {
+        reg = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+      }
+
+      await reg.update();
+
+      if (reg.waiting) {
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        window.setTimeout(() => reloadWithBuildParam(pendingUpdateBuildId), 900);
+        return;
+      }
+
+      if (reg.installing) {
+        reg.installing.addEventListener('statechange', () => {
+          if (reg.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            window.setTimeout(() => reloadWithBuildParam(pendingUpdateBuildId), 900);
+          }
+        });
+        window.setTimeout(() => reloadWithBuildParam(pendingUpdateBuildId), 1400);
+        return;
+      }
+
+      await checkForAppUpdate(manual);
+      if (!manual) return;
+      reloadWithBuildParam(pendingUpdateBuildId);
+    } catch (err) {
+      console.warn('app update failed', err);
+      if (manual) window.UI.toast('更新処理に失敗しました。再読み込みします');
+      reloadWithBuildParam(pendingUpdateBuildId);
+    }
+  }
+
+  function showAppUpdateNotice(reg, buildId) {
+    pendingUpdateBuildId = buildId || APP_BUILD_ID;
+
+    let notice = document.getElementById('app-update-notice');
+    if (!notice) {
+      notice = document.createElement('div');
+      notice.id = 'app-update-notice';
+      notice.className = 'app-update-notice';
+      notice.innerHTML = `
+        <div class="app-update-notice-text">最新版があります</div>
+        <button type="button" id="btn-apply-update" class="app-update-notice-btn">更新して再起動</button>
+      `;
+      document.body.appendChild(notice);
+    }
+
+    notice.classList.remove('hidden');
+    const btn = document.getElementById('btn-apply-update');
+    if (btn && !btn.dataset.bound) {
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', () => triggerAppUpdate(true));
+    }
+
+    if (reg) watchServiceWorkerUpdate(reg);
+  }
+
+  function reloadWithBuildParam(buildId) {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('v', buildId || APP_BUILD_ID);
+      url.searchParams.set('reload', String(Date.now()));
+      window.location.replace(url.toString());
+    } catch (_) {
+      window.location.reload();
+    }
   }
 
   // ===== 旧5件デモの整理 =====

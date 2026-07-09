@@ -20,6 +20,35 @@
 
 ---
 
+## 2026-07-09 PWA更新改善版
+
+### Added
+
+- `version.json` を追加し、起動後に最新版ビルドを確認できるようにした
+- 新版検知時に「最新版があります」通知を表示する処理を追加
+- 「更新して再起動」ボタンを追加
+- Service Worker更新後にバージョン付きURLで再読み込みする処理を追加
+- 更新通知用のCSSを追加
+
+### Changed
+
+- 設定画面の「アプリを更新」を、Service Worker更新とバージョン付き再読み込みを行う処理へ変更
+- `index.html` のCSS/JS読み込みクエリを `20260709-update1` に統一
+- アプリ内部バージョンを `1.0.9` に更新
+- Service Workerのキャッシュ識別子を `visit-manager-v20260709-update1` に更新
+- PWA更新は手動ボタン中心ではなく、起動後の通知中心に変更
+
+### Fixed
+
+- iPhone PWAで設定画面の更新ボタンだけでは最新版に切り替わりにくい問題を軽減
+- タスクキルしないと更新されない状況を減らすため、URLバージョン付き再読み込みを追加
+
+### Removed
+
+- リポジトリに残っていた場合、作業用の `INDEX_VERSION_PATCH.txt`、`INDEX_HTML_VERSION_PATCH.md`、`README_UPLOAD.txt`、`UPLOAD_AND_REPAIR_INSTRUCTIONS.md` は削除対象
+
+---
+
 ## 2026-07-09 修復版
 
 ### Added
