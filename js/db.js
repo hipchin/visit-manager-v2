@@ -11,7 +11,7 @@ window.DB = (() => {
     version: 'vm_version'
   };
 
-  const APP_VERSION = '1.0.7';
+  const APP_VERSION = '1.0.8';
 
   function load(key, fallback) {
     try {
@@ -194,7 +194,7 @@ window.DB = (() => {
     setBackupDate(data.exportedAt || null);
   }
 
-  // IndexedDB スナップショット（起動時自動）
+  // IndexedDB スナップショット（起動後に app.js から遅延実行）
   function snapshotToIndexedDB() {
     if (!window.indexedDB) return;
 

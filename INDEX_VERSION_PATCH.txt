@@ -1,0 +1,18 @@
+index.html は今回のZIPに含めていません。
+既存の index.html を触る場合は、以下の文字列だけを置換してください。
+
+置換前:
+20260630-location1
+
+置換後:
+20260709-speed1
+
+対象行:
+- css/style.css?v=20260630-location1
+- js/db.js?v=20260630-location1
+- js/tags.js?v=20260630-location1
+- js/ui.js?v=20260630-location1
+- js/app.js?v=20260630-location1
+
+注意:
+HTML構造や既存コメントは変更しないでください。

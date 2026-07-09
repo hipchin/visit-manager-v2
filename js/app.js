@@ -4,17 +4,21 @@
   let activeTagIds = [];
   let searchQuery = '';
 
+  // ===== 起動高速化設定 =====
+  const LIST_INITIAL_LIMIT = 50;
+  const LIST_MORE_LIMIT = 50;
+  const TRASH_PURGE_KEY = 'vm_last_trash_purge';
+
   // ===== 初期化 =====
   function init() {
     // ボタンが無反応になる事故を避けるため、イベント登録を最優先する
     safeRun('bindEvents', bindEvents);
-    safeRun('purgeExpiredTrash', () => window.DB.purgeExpiredTrash());
-    safeRun('snapshotToIndexedDB', () => window.DB.snapshotToIndexedDB());
-    safeRun('updateBackupNotice', () => window.UI.updateBackupNotice());
+    safeRun('patchOptimizedListRenderer', patchOptimizedListRenderer);
     safeRun('migrateLegacyDemoData', migrateLegacyDemoData);
     safeRun('insertDemoData', insertDemoData);
     safeRun('renderList', renderList);
     safeRun('registerSW', registerSW);
+    schedulePostStartupTasks();
   }
 
   function safeRun(label, fn) {
@@ -24,6 +28,40 @@
       console.error(label + ' failed', err);
       showStartupError(label, err);
       return null;
+    }
+  }
+
+  function runLater(fn, delay) {
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => safeRun(fn.name || 'idleTask', fn), { timeout: delay + 2000 });
+      return;
+    }
+    window.setTimeout(() => safeRun(fn.name || 'delayedTask', fn), delay);
+  }
+
+  function schedulePostStartupTasks() {
+    // 起動直後の白画面を避けるため、表示に不要な処理は後回しにする。
+    runLater(updateBackupNoticeLater, 300);
+    runLater(purgeTrashOncePerDay, 900);
+    runLater(snapshotToIndexedDBLater, 1600);
+  }
+
+  function updateBackupNoticeLater() {
+    window.UI.updateBackupNotice();
+  }
+
+  function snapshotToIndexedDBLater() {
+    window.DB.snapshotToIndexedDB();
+  }
+
+  function purgeTrashOncePerDay() {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      if (localStorage.getItem(TRASH_PURGE_KEY) === today) return;
+      window.DB.purgeExpiredTrash();
+      localStorage.setItem(TRASH_PURGE_KEY, today);
+    } catch (err) {
+      console.warn('daily trash purge failed', err);
     }
   }
 
@@ -66,6 +104,233 @@
     const visits = window.DB.getVisits();
     const tags = window.DB.getTags();
     window.UI.renderList(Array.isArray(visits) ? visits : [], Array.isArray(tags) ? tags : [], searchQuery, activeTagIds);
+  }
+
+  // ===== 一覧描画の高速化パッチ =====
+  function patchOptimizedListRenderer() {
+    if (!window.UI || typeof window.UI.renderList !== 'function') return;
+
+    const state = {
+      renderedCount: LIST_INITIAL_LIMIT,
+      lastSignature: ''
+    };
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function hasLatLng(entry) {
+      return Number.isFinite(Number(entry && entry.lat)) && Number.isFinite(Number(entry && entry.lng));
+    }
+
+    function entryTitle(entry) {
+      return (entry.displayTitle || '').trim() || (entry.address || '').trim() || '場所未設定';
+    }
+
+    function genderLabel(g) {
+      return { male: '男性', female: '女性', other: 'その他' }[g] || '';
+    }
+
+    function closeOpenSwipeRows(exceptRow) {
+      document.querySelectorAll('.swipe-row.swiped').forEach(row => {
+        if (row !== exceptRow) row.classList.remove('swiped');
+      });
+    }
+
+    function attachSwipeHandlers(row, card) {
+      let startX = 0;
+      let startY = 0;
+      let currentX = 0;
+      let dragging = false;
+
+      card.addEventListener('touchstart', e => {
+        if (!e.touches || e.touches.length !== 1) return;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        currentX = 0;
+        dragging = false;
+        row.classList.add('dragging');
+      }, { passive: true });
+
+      card.addEventListener('touchmove', e => {
+        if (!e.touches || e.touches.length !== 1) return;
+        const dx = e.touches[0].clientX - startX;
+        const dy = e.touches[0].clientY - startY;
+        if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
+
+        dragging = true;
+        currentX = Math.max(-88, Math.min(0, dx));
+        if (currentX < 0) {
+          closeOpenSwipeRows(row);
+          card.style.transform = `translateX(${currentX}px)`;
+          e.preventDefault();
+        }
+      }, { passive: false });
+
+      card.addEventListener('touchend', () => {
+        row.classList.remove('dragging');
+        card.style.transform = '';
+        if (!dragging) return;
+        row.classList.toggle('swiped', currentX <= -48);
+        dragging = false;
+      });
+    }
+
+    function createVisitRow(v, tagMap) {
+      const days = window.daysSince(v.lastVisit);
+      const isOverdue = days === null || days >= 14;
+      const row = document.createElement('div');
+      row.className = 'swipe-row';
+      row.dataset.id = v.id;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'swipe-delete-btn';
+      deleteBtn.dataset.id = v.id;
+      deleteBtn.type = 'button';
+      deleteBtn.textContent = '削除';
+
+      const card = document.createElement('div');
+      card.className = 'visit-card' + (isOverdue ? ' overdue' : '');
+      card.dataset.id = v.id;
+
+      let badgeHtml = '';
+      if (days === null) {
+        badgeHtml = `<span class="badge badge-warn">未訪問</span>`;
+      } else if (days >= 14) {
+        badgeHtml = `<span class="badge badge-warn">${days}日経過</span>`;
+      } else if (days <= 3) {
+        badgeHtml = `<span class="badge badge-ok">${days}日前</span>`;
+      } else {
+        badgeHtml = `<span class="badge badge-neutral">${days}日前</span>`;
+      }
+
+      let tagsHtml = '';
+      if (v.tags && v.tags.length > 0) {
+        tagsHtml = '<div class="card-tags">';
+        v.tags.forEach(tid => {
+          const tag = tagMap[tid];
+          if (!tag) return;
+          tagsHtml += `<span class="tag-chip" style="background:${window.hexToRgba(tag.color, 0.12)};color:${tag.color}">${escapeHtml(tag.name)}</span>`;
+        });
+        tagsHtml += '</div>';
+      }
+
+      const lastStr = v.lastVisit
+        ? `最終訪問 ${window.formatDate(v.lastVisit)}${v.lastTime ? '（' + window.timeLabel(v.lastTime) + '）' : ''}`
+        : '未訪問';
+
+      const title = entryTitle(v);
+      const placeMemoHtml = v.placeMemo ? `<div class="card-place-memo">${escapeHtml(v.placeMemo)}</div>` : '';
+      const lat = hasLatLng(v) ? String(v.lat) : '';
+      const lng = hasLatLng(v) ? String(v.lng) : '';
+
+      card.innerHTML = `
+        <div class="card-top">
+          <span class="card-address">${escapeHtml(title)}</span>
+          ${badgeHtml}
+        </div>
+        <div class="card-name">${escapeHtml(v.name || '不明')}${v.gender ? '・' + genderLabel(v.gender) : ''}</div>
+        ${placeMemoHtml}
+        ${tagsHtml}
+        <div class="card-bottom">
+          <span class="card-date${isOverdue ? ' overdue' : ''}">${escapeHtml(lastStr)}</span>
+          <button class="card-map-btn" data-address="${encodeURIComponent(v.address || title || '')}" data-lat="${escapeHtml(lat)}" data-lng="${escapeHtml(lng)}" aria-label="マップで開く">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+            マップ
+          </button>
+        </div>
+      `;
+
+      row.appendChild(deleteBtn);
+      row.appendChild(card);
+      attachSwipeHandlers(row, card);
+      return row;
+    }
+
+    function buildFilteredVisits(visits, searchQueryValue, activeTagIdsValue) {
+      let filtered = visits.slice();
+
+      if (searchQueryValue) {
+        const q = searchQueryValue.toLowerCase();
+        filtered = filtered.filter(v =>
+          (v.displayTitle || '').toLowerCase().includes(q) ||
+          (v.address || '').toLowerCase().includes(q) ||
+          (v.name || '').toLowerCase().includes(q) ||
+          (v.placeMemo || '').toLowerCase().includes(q) ||
+          (v.memo || '').toLowerCase().includes(q)
+        );
+      }
+
+      if (activeTagIdsValue && activeTagIdsValue.length > 0) {
+        filtered = filtered.filter(v =>
+          activeTagIdsValue.every(tid => v.tags && v.tags.includes(tid))
+        );
+      }
+
+      // 最終訪問日が古い順
+      filtered.sort((a, b) => {
+        const da = a.lastVisit ? new Date(a.lastVisit).getTime() : 0;
+        const db = b.lastVisit ? new Date(b.lastVisit).getTime() : 0;
+        return da - db;
+      });
+
+      return filtered;
+    }
+
+    window.UI.renderList = function optimizedRenderList(visits, tags, searchQueryValue, activeTagIdsValue) {
+      const container = document.getElementById('visit-list');
+      const tagMap = Object.fromEntries(tags.map(t => [t.id, t]));
+      const filtered = buildFilteredVisits(visits, searchQueryValue, activeTagIdsValue);
+      const signature = [
+        visits.length,
+        filtered.length,
+        searchQueryValue || '',
+        (activeTagIdsValue || []).join(','),
+        filtered.map(v => v.id + ':' + (v.updatedAt || '')).slice(0, 20).join('|')
+      ].join('::');
+
+      if (signature !== state.lastSignature) {
+        state.renderedCount = LIST_INITIAL_LIMIT;
+        state.lastSignature = signature;
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+          <p>訪問先がありません</p>
+        </div>`;
+        return;
+      }
+
+      const count = Math.min(state.renderedCount, filtered.length);
+      const fragment = document.createDocumentFragment();
+      for (let i = 0; i < count; i += 1) {
+        fragment.appendChild(createVisitRow(filtered[i], tagMap));
+      }
+
+      container.innerHTML = '';
+      container.appendChild(fragment);
+
+      if (count < filtered.length) {
+        const moreWrap = document.createElement('div');
+        moreWrap.style.padding = '12px 16px 28px';
+        const moreBtn = document.createElement('button');
+        moreBtn.type = 'button';
+        moreBtn.className = 'btn-secondary';
+        moreBtn.textContent = `さらに表示（${count}/${filtered.length}件）`;
+        moreBtn.addEventListener('click', () => {
+          state.renderedCount += LIST_MORE_LIMIT;
+          window.UI.renderList(visits, tags, searchQueryValue, activeTagIdsValue);
+        });
+        moreWrap.appendChild(moreBtn);
+        container.appendChild(moreWrap);
+      }
+    };
   }
 
   // ===== イベントバインド =====
