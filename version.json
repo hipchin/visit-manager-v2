@@ -1,6 +1,6 @@
 {
-  "buildId": "20260711-mapfix1",
-  "appVersion": "1.0.10",
+  "buildId": "20260711-iosfix1",
+  "appVersion": "1.0.11",
   "releasedAt": "2026-07-11",
-  "notes": "住所手入力時に空座標が0,0としてGoogleマップへ渡される問題を修正"
+  "notes": "Googleマップ復帰時の白画面とiPhoneバックアップ保存画面を改善"
 }

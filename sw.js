@@ -2,7 +2,7 @@
 // 旧キャッシュを削除し、通常の通信はネットワークへ流す。
 // 新版が見つかった場合は、アプリ側の通知から SKIP_WAITING を送って反映する。
 
-const CACHE_VERSION = 'visit-manager-v20260711-mapfix1';
+const CACHE_VERSION = 'visit-manager-v20260711-iosfix1';
 
 self.addEventListener('install', event => {
   // 初回インストールは通常通り完了させる。

@@ -11,7 +11,7 @@ window.DB = (() => {
     version: 'vm_version'
   };
 
-  const APP_VERSION = '1.0.10';
+  const APP_VERSION = '1.0.11';
 
   function load(key, fallback) {
     try {
@@ -180,9 +180,9 @@ window.DB = (() => {
   }
 
   // export / import
-  function exportData() {
+  function exportData(markBackup = true) {
     const data = getAllData();
-    setBackupDate(data.exportedAt);
+    if (markBackup) setBackupDate(data.exportedAt);
     return data;
   }
 

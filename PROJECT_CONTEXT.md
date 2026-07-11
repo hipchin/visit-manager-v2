@@ -715,3 +715,13 @@ Service Worker方針:
 - 有効な座標がない場合は、入力された住所文字列をそのままGoogleマップへ渡す。
 - 短縮住所の地域補完は固定せず、Googleマップ側の検索・推測に任せる。
 - 既存データに `lat: 0`、`lng: 0` が残っていても、住所検索へフォールバックする。
+
+## iPhone外部遷移とバックアップ保存
+
+- Googleマップ起動では `window.open(..., '_blank')` を使用しない。
+- iPhone PWAから外部地図アプリを開く際は、現在の画面を同一遷移させ、一時Safari画面を残さない。
+- JSONバックアップはファイル共有に対応する端末ではWeb Share APIを優先する。
+- `navigator.share` と `navigator.canShare({ files })` の両方を確認する。
+- 共有API非対応環境ではBlob URLと `download` 属性による保存へフォールバックする。
+- ユーザーが共有をキャンセルした場合は `vm_backup_date` を更新しない。
+- localStorage、JSON形式、インポート互換性は変更しない。

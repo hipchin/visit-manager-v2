@@ -8,7 +8,7 @@
   const LIST_INITIAL_LIMIT = 50;
   const LIST_MORE_LIMIT = 50;
   const TRASH_PURGE_KEY = 'vm_last_trash_purge';
-  const APP_BUILD_ID = '20260711-mapfix1';
+  const APP_BUILD_ID = '20260711-iosfix1';
 
   // ===== 初期化 =====
   function init() {
@@ -588,16 +588,44 @@
     });
 
     // エクスポート
-    document.getElementById('btn-export').addEventListener('click', () => {
-      const data = window.DB.exportData();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `visit-backup-${new Date().toISOString().slice(0,10)}.json`;
-      a.click();
-      window.UI.renderSettings();
-      window.UI.updateBackupNotice();
-      window.UI.toast('バックアップを保存しました');
+    document.getElementById('btn-export').addEventListener('click', async () => {
+      const data = window.DB.exportData(false);
+      const fileName = `visit-backup-${new Date().toISOString().slice(0,10)}.json`;
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+
+      try {
+        const file = new File([blob], fileName, { type: 'application/json' });
+        const canShareFile = navigator.share && navigator.canShare && navigator.canShare({ files: [file] });
+
+        if (canShareFile) {
+          await navigator.share({
+            files: [file],
+            title: '訪問管理バックアップ'
+          });
+        } else {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        window.DB.setBackupDate(data.exportedAt);
+        window.UI.renderSettings();
+        window.UI.updateBackupNotice();
+        window.UI.toast('バックアップを保存しました');
+      } catch (err) {
+        if (err && err.name === 'AbortError') {
+          window.UI.toast('バックアップ保存をキャンセルしました');
+          return;
+        }
+        console.warn('backup export failed', err);
+        window.UI.toast('バックアップを保存できませんでした');
+      }
     });
 
     // インポート
@@ -699,7 +727,7 @@
     const latNum = hasRawLat ? Number(lat) : NaN;
     const lngNum = hasRawLng ? Number(lng) : NaN;
     if (Number.isFinite(latNum) && Number.isFinite(lngNum) && !(latNum === 0 && lngNum === 0)) {
-      window.open(`https://maps.google.com/?q=${encodeURIComponent(latNum + ',' + lngNum)}`, '_blank');
+      window.location.href = `https://maps.google.com/?q=${encodeURIComponent(latNum + ',' + lngNum)}`;
       return;
     }
 
@@ -709,7 +737,7 @@
       return;
     }
     const encoded = encodeURIComponent(addr);
-    window.open(`https://maps.google.com/?q=${encoded}`, '_blank');
+    window.location.href = `https://maps.google.com/?q=${encoded}`;
   }
 
   // ===== カスタム確認ダイアログ =====
