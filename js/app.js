@@ -8,7 +8,7 @@
   const LIST_INITIAL_LIMIT = 50;
   const LIST_MORE_LIMIT = 50;
   const TRASH_PURGE_KEY = 'vm_last_trash_purge';
-  const APP_BUILD_ID = '20260709-update1';
+  const APP_BUILD_ID = '20260711-mapfix1';
 
   // ===== 初期化 =====
   function init() {
@@ -131,7 +131,11 @@
     }
 
     function hasLatLng(entry) {
-      return Number.isFinite(Number(entry && entry.lat)) && Number.isFinite(Number(entry && entry.lng));
+      if (!entry || entry.lat === null || entry.lat === undefined || entry.lng === null || entry.lng === undefined) return false;
+      if (String(entry.lat).trim() === '' || String(entry.lng).trim() === '') return false;
+      const lat = Number(entry.lat);
+      const lng = Number(entry.lng);
+      return Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
     }
 
     function entryTitle(entry) {
@@ -690,9 +694,11 @@
   }
 
   function openMap(address, lat, lng) {
-    const latNum = Number(lat);
-    const lngNum = Number(lng);
-    if (Number.isFinite(latNum) && Number.isFinite(lngNum)) {
+    const hasRawLat = lat !== null && lat !== undefined && String(lat).trim() !== '';
+    const hasRawLng = lng !== null && lng !== undefined && String(lng).trim() !== '';
+    const latNum = hasRawLat ? Number(lat) : NaN;
+    const lngNum = hasRawLng ? Number(lng) : NaN;
+    if (Number.isFinite(latNum) && Number.isFinite(lngNum) && !(latNum === 0 && lngNum === 0)) {
       window.open(`https://maps.google.com/?q=${encodeURIComponent(latNum + ',' + lngNum)}`, '_blank');
       return;
     }

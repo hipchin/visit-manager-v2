@@ -1,6 +1,6 @@
 {
-  "buildId": "20260709-update1",
-  "appVersion": "1.0.9",
-  "releasedAt": "2026-07-09",
-  "notes": "起動高速化とPWA更新通知の改善"
+  "buildId": "20260711-mapfix1",
+  "appVersion": "1.0.10",
+  "releasedAt": "2026-07-11",
+  "notes": "住所手入力時に空座標が0,0としてGoogleマップへ渡される問題を修正"
 }

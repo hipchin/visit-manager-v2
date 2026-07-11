@@ -27,12 +27,19 @@ window.UI = (() => {
   }
 
   function toNumberOrNull(value) {
+    if (value === null || value === undefined || String(value).trim() === '') {
+      return null;
+    }
     const n = Number(value);
     return Number.isFinite(n) ? n : null;
   }
 
   function hasLatLng(entry) {
-    return Number.isFinite(Number(entry && entry.lat)) && Number.isFinite(Number(entry && entry.lng));
+    if (!entry || entry.lat === null || entry.lat === undefined || entry.lng === null || entry.lng === undefined) return false;
+    if (String(entry.lat).trim() === '' || String(entry.lng).trim() === '') return false;
+    const lat = Number(entry.lat);
+    const lng = Number(entry.lng);
+    return Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
   }
 
   function entryTitle(entry) {
