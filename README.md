@@ -15,6 +15,7 @@ visit-manager/
 ├── index.html
 ├── manifest.json
 ├── sw.js
+├── version.json
 ├── css/
 │   └── style.css
 ├── js/
@@ -82,9 +83,23 @@ visit-manager/
 - 保存済み訪問データの破壊的な形式変更
 - JSONバックアップ形式の破壊的変更
 
-## 起動高速化・PWA更新改善版 20260709-update1
+## 起動高速化ホットフィックス 20260718-speed2
 
-データ件数が増えた時のPWA起動白画面を軽減するため、以下を導入しています。
+白画面が約5秒続く問題を軽減するため、次の処理を追加しています。
+
+- Service Workerでアプリ本体を端末内へキャッシュ
+- 2回目以降はキャッシュを優先して画面を表示
+- 画面表示後、バックグラウンドで静的ファイルを更新
+- `version.json`はキャッシュせず、従来の更新通知を維持
+- Leaflet CDNのCSS・JavaScriptを2回目以降キャッシュ
+- OpenStreetMap地図タイルとNominatim住所検索結果はキャッシュしない
+- `vm_visits`、`vm_trash`、`vm_tags`を起動中に何度もJSON解析しない
+- localStorageのキーとJSONバックアップ形式は変更しない
+- アプリ表示バージョンは`1.0.11`のまま維持するホットフィックス
+
+この更新の効果は、Service Workerが新しいキャッシュを作成した後の2回目以降の起動で最も現れます。
+
+## これまでの起動高速化
 
 - 起動直後のIndexedDBスナップショットを遅延実行
 - 起動直後のバックアップ通知更新を遅延実行
@@ -94,24 +109,21 @@ visit-manager/
 - 起動後に `version.json` を確認し、新版があれば更新通知を表示
 - 「更新して再起動」ボタンでService Worker更新とバージョン付き再読み込みを実行
 - 設定画面の「アプリを更新」は保険として残す
-- localStorageの既存キーと保存形式は変更なし
-- 既存データを削除・移行・初期化しない方針を維持
+- localStorageの既存キーと保存形式は変更しない
+- 既存データを削除・移行・初期化しない
 
-## 反映手順
+## 今回の反映手順
 
-1. ZIPを解凍する
-2. GitHubリポジトリのルートに中身をそのままアップロードする
-3. 既存ファイルは上書きする
-4. GitHub上に次の不要ファイルが残っている場合は削除する
-   - `INDEX_VERSION_PATCH.txt`
-   - `INDEX_HTML_VERSION_PATCH.md`
-   - `README_UPLOAD.txt`
-   - `UPLOAD_AND_REPAIR_INSTRUCTIONS.md`
-5. GitHub ActionsのDeployが完了するまで待つ
-6. Safariで公開URLを `?v=20260709-update1` 付きで開く
-7. 画面に「最新版があります」が表示された場合は「更新して再起動」を押す
-8. 表示されない場合は設定 → アプリを更新を押す
-9. それでも古い表示が残る場合のみPWAを閉じて開き直す
+1. 念のため、現在のアプリでJSONバックアップを保存する
+2. ZIPを解凍する
+3. ZIP内のファイルをGitHubリポジトリのルートへアップロードする
+4. `sw.js`、`js/db.js`、4つのMarkdownファイルを上書きする
+5. 変更していない`index.html`、`js/app.js`、`js/ui.js`、アイコンは削除しない
+6. GitHub ActionsのDeploy完了を確認する
+7. iPhoneのPWAを開く
+8. 「最新版があります」が表示された場合は「更新して再起動」を押す
+9. 表示されない場合は、設定画面の「アプリを更新」を1回押す
+10. 一度PWAを閉じて再度開き、2回目以降の起動時間を確認する
 
 ## 修正時の注意
 

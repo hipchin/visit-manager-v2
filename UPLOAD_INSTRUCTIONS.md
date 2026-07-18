@@ -1,15 +1,65 @@
 # アップロード手順
 
-1. このZIPを解凍する。
-2. GitHubリポジトリ `hipchin/visit-manager-v2` のルートへ中身を上書きアップロードする。
-3. GitHub上に次の作業用ファイルが残っている場合は削除する。
-   - `INDEX_VERSION_PATCH.txt`
-   - `INDEX_HTML_VERSION_PATCH.md`
-   - `README_UPLOAD.txt`
-   - `UPLOAD_AND_REPAIR_INSTRUCTIONS.md`
-4. Actions の Deploy が完了するまで待つ。
-5. 公開URLを `?v=20260709-update1` 付きで開く。
-6. PWA画面に「最新版があります」と出た場合は「更新して再起動」を押す。
-7. 表示が古い場合は、設定 → アプリを更新を押す。
+## ZIPの性質
 
-この修正では localStorage の保存キーと保存形式は変更していません。
+このZIPは、変更したファイルだけを収録した「差し替え用ZIP」です。
+
+GitHubのリポジトリ全体を削除したり、ZIPの内容だけでリポジトリを作り直したりしないでください。
+
+## 収録ファイル
+
+- `sw.js`
+- `js/db.js`
+- `README.md`
+- `PROJECT_CONTEXT.md`
+- `CHANGELOG.md`
+- `TODO.md`
+
+## 手順
+
+1. 現在の訪問管理アプリを開く
+2. 設定からJSONバックアップを保存する
+3. このZIPを解凍する
+4. GitHubの`hipchin/visit-manager-v2`を開く
+5. リポジトリのルートで「Add file」→「Upload files」を開く
+6. 解凍したフォルダ内の6ファイルを、フォルダ構造を維持してアップロードする
+7. `js/db.js`が`js`フォルダ内へ入ることを確認する
+8. 既存ファイルの上書きを確定する
+9. GitHub ActionsのDeploy完了を確認する
+10. iPhoneのPWAを開く
+11. 「最新版があります」が出た場合は「更新して再起動」を押す
+12. 出ない場合は設定画面の「アプリを更新」を1回押す
+13. PWAを一度閉じる
+14. 再度開いて起動時間を確認する
+
+## 削除禁止
+
+次のファイルやフォルダは削除しないでください。
+
+- `index.html`
+- `manifest.json`
+- `version.json`
+- `css/`
+- `js/app.js`
+- `js/tags.js`
+- `js/ui.js`
+- `icons/`
+- `.github/`
+
+## 確認項目
+
+- 訪問先一覧が表示される
+- 新規登録できる
+- 編集できる
+- 削除してゴミ箱へ移動できる
+- ゴミ箱から復元できる
+- Google Mapsを開ける
+- JSONバックアップを保存できる
+- 2回目以降の起動が速くなる
+- 機内モードでもアプリ本体が起動する
+
+## 戻し方
+
+不具合が出た場合は、GitHubのコミット履歴から今回のコミット直前へ戻してください。
+
+localStorageのキーとJSON形式は変更していないため、コードを戻しても保存済みデータはそのまま使用できます。

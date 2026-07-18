@@ -1,0 +1,30 @@
+{
+  "CHANGELOG.md": {
+    "bytes": 6969,
+    "lines": 211
+  },
+  "PROJECT_CONTEXT.md": {
+    "bytes": 14075,
+    "lines": 574
+  },
+  "README.md": {
+    "bytes": 6170,
+    "lines": 152
+  },
+  "TODO.md": {
+    "bytes": 3706,
+    "lines": 106
+  },
+  "UPLOAD_INSTRUCTIONS.md": {
+    "bytes": 2018,
+    "lines": 65
+  },
+  "js/db.js": {
+    "bytes": 8955,
+    "lines": 316
+  },
+  "sw.js": {
+    "bytes": 5144,
+    "lines": 163
+  }
+}

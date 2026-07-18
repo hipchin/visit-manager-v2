@@ -1,6 +1,11 @@
 // db.js — データ永続化レイヤー
 // localStorage をメインストレージとして使用
-// IndexedDB にスナップショットを保存（起動時自動）
+// IndexedDB にスナップショットを保存（起動後に遅延実行）
+//
+// 2026-07-18 起動高速化:
+// - localStorageの同一JSONを起動中に何度もJSON.parseしない
+// - メモリキャッシュは永続化形式を変更しない
+// - 保存、インポート、削除、復元時には必ずキャッシュも同期する
 
 window.DB = (() => {
   const KEYS = {
@@ -11,7 +16,14 @@ window.DB = (() => {
     version: 'vm_version'
   };
 
+  // version.json と app.js の整合を維持するホットフィックスのため変更しない。
   const APP_VERSION = '1.0.11';
+
+  const UNLOADED = Symbol('unloaded');
+  let visitsCache = UNLOADED;
+  let trashCache = UNLOADED;
+  let tagsCache = UNLOADED;
+  let backupDateCache = UNLOADED;
 
   function load(key, fallback) {
     try {
@@ -43,8 +55,16 @@ window.DB = (() => {
     if (normalized.placeMemo == null) normalized.placeMemo = '';
     if (normalized.locationSource == null) normalized.locationSource = '';
 
-    const lat = Number(normalized.lat);
-    const lng = Number(normalized.lng);
+    // 空欄やnullを0へ変換しない。既存の0,0はアプリ側で無効座標として扱う。
+    const rawLat = normalized.lat;
+    const rawLng = normalized.lng;
+    const lat = rawLat === null || rawLat === undefined || String(rawLat).trim() === ''
+      ? NaN
+      : Number(rawLat);
+    const lng = rawLng === null || rawLng === undefined || String(rawLng).trim() === ''
+      ? NaN
+      : Number(rawLng);
+
     normalized.lat = Number.isFinite(lat) ? lat : null;
     normalized.lng = Number.isFinite(lng) ? lng : null;
 
@@ -61,11 +81,40 @@ window.DB = (() => {
       { id: 'tag_2', name: '手応えあり', color: '#16a34a' },
       { id: 'tag_3', name: '要フォロー', color: '#d97706' }
     ];
-    return Array.isArray(value) ? value : fallback;
+    return Array.isArray(value) ? value.map(tag => ({ ...tag })) : fallback;
   }
 
-  function getVisits() { return normalizeVisits(load(KEYS.visits, [])); }
-  function saveVisits(visits) { save(KEYS.visits, normalizeVisits(visits)); }
+  function ensureVisitsLoaded() {
+    if (visitsCache === UNLOADED) {
+      visitsCache = normalizeVisits(load(KEYS.visits, []));
+    }
+    return visitsCache;
+  }
+
+  function ensureTrashLoaded() {
+    if (trashCache === UNLOADED) {
+      trashCache = normalizeVisits(load(KEYS.trash, []));
+    }
+    return trashCache;
+  }
+
+  function ensureTagsLoaded() {
+    if (tagsCache === UNLOADED) {
+      tagsCache = normalizeTags(load(KEYS.tags, null));
+    }
+    return tagsCache;
+  }
+
+  function getVisits() {
+    // 配列自体は複製し、UI側のsortやspliceがキャッシュ本体へ影響しないようにする。
+    return ensureVisitsLoaded().slice();
+  }
+
+  function saveVisits(visits) {
+    const normalized = normalizeVisits(visits);
+    save(KEYS.visits, normalized);
+    visitsCache = normalized;
+  }
 
   function addVisit(entry) {
     const visits = getVisits();
@@ -88,12 +137,19 @@ window.DB = (() => {
   }
 
   function getVisitById(id) {
-    return getVisits().find(v => v.id === id) || null;
+    return ensureVisitsLoaded().find(v => v.id === id) || null;
   }
 
   // trash
-  function getTrash() { return normalizeVisits(load(KEYS.trash, [])); }
-  function saveTrash(trash) { save(KEYS.trash, normalizeVisits(trash)); }
+  function getTrash() {
+    return ensureTrashLoaded().slice();
+  }
+
+  function saveTrash(trash) {
+    const normalized = normalizeVisits(trash);
+    save(KEYS.trash, normalized);
+    trashCache = normalized;
+  }
 
   function moveToTrash(id) {
     const visits = getVisits();
@@ -128,16 +184,21 @@ window.DB = (() => {
 
   // tags
   function getTags() {
-    return normalizeTags(load(KEYS.tags, null));
+    return ensureTagsLoaded().slice();
   }
-  function saveTags(tags) { save(KEYS.tags, normalizeTags(tags)); }
+
+  function saveTags(tags) {
+    const normalized = normalizeTags(tags);
+    save(KEYS.tags, normalized);
+    tagsCache = normalized;
+  }
 
   function addTag(tag) {
     const tags = getTags();
-    tag.id = 'tag_' + Date.now().toString(36);
-    tags.push(tag);
+    const newTag = { ...tag, id: 'tag_' + Date.now().toString(36) };
+    tags.push(newTag);
     saveTags(tags);
-    return tag;
+    return newTag;
   }
 
   function updateTag(id, patch) {
@@ -166,8 +227,18 @@ window.DB = (() => {
   }
 
   // backup
-  function getBackupDate() { return load(KEYS.backupDate, null); }
-  function setBackupDate(d) { save(KEYS.backupDate, d || new Date().toISOString()); }
+  function getBackupDate() {
+    if (backupDateCache === UNLOADED) {
+      backupDateCache = load(KEYS.backupDate, null);
+    }
+    return backupDateCache;
+  }
+
+  function setBackupDate(d) {
+    const value = d || new Date().toISOString();
+    save(KEYS.backupDate, value);
+    backupDateCache = value;
+  }
 
   function getAllData() {
     return {
@@ -229,7 +300,9 @@ window.DB = (() => {
     };
   }
 
-  function getVersion() { return APP_VERSION; }
+  function getVersion() {
+    return APP_VERSION;
+  }
 
   return {
     getVisits, saveVisits, addVisit, updateVisit, getVisitById,
