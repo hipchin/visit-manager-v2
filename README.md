@@ -26,6 +26,11 @@ visit-manager/
 ├── icons/
 │   ├── icon-192.png
 │   └── icon-512.png
+├── vendor/
+│   └── leaflet/
+│       ├── leaflet.css
+│       ├── leaflet.js
+│       └── images/
 ├── .github/
 │   └── workflows/
 │       └── deploy.yml
@@ -82,6 +87,18 @@ visit-manager/
 - localStorageの初期化
 - 保存済み訪問データの破壊的な形式変更
 - JSONバックアップ形式の破壊的変更
+
+## Leaflet遅延読込 20260726-leaflet-lazy1
+
+起動時に地図ライブラリを読み込むことによる遅延を解消するため、次の変更を行っています。
+
+- LeafletをunpkgのCDNから`vendor/leaflet/`への自前ホストへ変更
+- `index.html`からLeafletの`<link>`・`<script>`を削除し、起動時には一切読み込まない
+- 「地図で選ぶ」（地図ピッカー）を開いた時にだけ、Leaflet本体を動的に読み込む
+- Service Workerのアプリシェルキャッシュに自前ホストのLeaflet資産を追加し、2回目以降は地図ピッカーもオフラインで開けるようにする
+- 「マップで確認」ボタン（Google Maps起動）はもともとLeafletを使用しないため影響なし
+
+この変更により、一覧画面だけを使う通常の起動では外部ネットワークへの依存が無くなります。
 
 ## 起動高速化ホットフィックス 20260718-speed2
 

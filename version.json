@@ -1,6 +1,6 @@
 {
-  "buildId": "20260711-iosfix1",
-  "appVersion": "1.0.11",
-  "releasedAt": "2026-07-11",
-  "notes": "Googleマップ復帰時の白画面とiPhoneバックアップ保存画面を改善"
+  "buildId": "20260726-leaflet-lazy1",
+  "appVersion": "1.0.12",
+  "releasedAt": "2026-07-26",
+  "notes": "Leafletを地図ピッカー使用時のみ読み込むよう変更し、起動時のブロッキングを解消"
 }

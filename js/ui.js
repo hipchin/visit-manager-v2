@@ -413,20 +413,46 @@ window.UI = (() => {
   }
 
   // ===== 地図ピッカー =====
+  // 20260726-leaflet-lazy1: 起動時のブロッキングを避けるため、
+  // Leafletは地図ピッカーを開いた時にだけ自前ホスト資産から読み込む。
+  const LEAFLET_ASSET_VERSION = '20260726-leaflet-lazy1';
   let locationMap = null;
   let locationMarker = null;
   let pickedLocation = null;
   let pickedAddress = '';
   let reverseRequestId = 0;
+  let leafletLoadPromise = null;
+
+  function loadLeafletAssets() {
+    if (window.L) return Promise.resolve();
+    if (leafletLoadPromise) return leafletLoadPromise;
+
+    leafletLoadPromise = new Promise((resolve, reject) => {
+      if (!document.querySelector('link[data-leaflet-css]')) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'vendor/leaflet/leaflet.css?v=' + LEAFLET_ASSET_VERSION;
+        link.dataset.leafletCss = '1';
+        document.head.appendChild(link);
+      }
+
+      const script = document.createElement('script');
+      script.src = 'vendor/leaflet/leaflet.js?v=' + LEAFLET_ASSET_VERSION;
+      script.onload = () => resolve();
+      script.onerror = () => {
+        leafletLoadPromise = null;
+        reject(new Error('leaflet load failed'));
+      };
+      document.body.appendChild(script);
+    });
+
+    return leafletLoadPromise;
+  }
 
   function openLocationPicker() {
     const modal = document.getElementById('modal-location-picker');
     modal.classList.remove('hidden');
-
-    if (!window.L) {
-      document.getElementById('location-picker-status').textContent = '地図ライブラリを読み込めませんでした。通信状況を確認してください。';
-      return;
-    }
+    document.getElementById('location-picker-status').textContent = '地図を読み込んでいます…';
 
     const loc = getLocationFields();
     const startLat = Number.isFinite(loc.lat) ? loc.lat : 35.5086;
@@ -434,11 +460,16 @@ window.UI = (() => {
     pickedLocation = { lat: startLat, lng: startLng };
     pickedAddress = loc.address || '';
 
-    setTimeout(() => {
-      ensureLocationMap(startLat, startLng);
-      setPickedLocation(startLat, startLng, false);
-      if (locationMap) locationMap.invalidateSize();
-    }, 80);
+    loadLeafletAssets().then(() => {
+      setTimeout(() => {
+        ensureLocationMap(startLat, startLng);
+        setPickedLocation(startLat, startLng, false);
+        if (locationMap) locationMap.invalidateSize();
+        document.getElementById('location-picker-status').textContent = '地図をタップして場所を選んでください。';
+      }, 80);
+    }).catch(() => {
+      document.getElementById('location-picker-status').textContent = '地図ライブラリを読み込めませんでした。通信状況を確認してください。';
+    });
   }
 
   function closeLocationPicker() {

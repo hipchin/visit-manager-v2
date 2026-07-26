@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## 2026-07-26 Leaflet遅延読込
+
+### Added
+
+- `vendor/leaflet/`にLeaflet 1.9.4を自前ホスト（CSS、JS、マーカー画像）
+- 地図ピッカーを開いた時だけLeafletを動的読み込みする`loadLeafletAssets`
+- Service Workerのアプリシェルに自前ホストLeaflet資産を追加
+
+### Changed
+
+- `index.html`からLeafletのCDN`<link>`と`<script>`を削除（起動時の読み込みブロックを解消）
+- `sw.js`の`CACHE_VERSION`と`APP_SHELL_FILES`を`20260726-leaflet-lazy1`へ更新
+- `js/app.js`の`APP_BUILD_ID`、`js/db.js`の`APP_VERSION`(`1.0.12`)、`version.json`を更新
+
+### Removed
+
+- unpkg CDN（`https://unpkg.com/leaflet@1.9.4/`）への依存
+- Service Worker内のunpkg専用キャッシュ分岐（自前ホスト化により同一オリジンの静的ファイル処理に統合）
+
+---
+
 ## Unreleased
 
 ### Added

@@ -8,7 +8,7 @@
   const LIST_INITIAL_LIMIT = 50;
   const LIST_MORE_LIMIT = 50;
   const TRASH_PURGE_KEY = 'vm_last_trash_purge';
-  const APP_BUILD_ID = '20260711-iosfix1';
+  const APP_BUILD_ID = '20260726-leaflet-lazy1';
 
   // ===== 初期化 =====
   function init() {

@@ -56,11 +56,12 @@
 - `sw.js`: Service Worker、アプリシェルキャッシュ、更新処理
 - `version.json`: 最新ビルド確認用。キャッシュ禁止
 - `icons/`: PWAアイコン
+- `vendor/leaflet/`: 自前ホストのLeaflet 1.9.4（CSS・JS・マーカー画像）。地図ピッカーを開いた時だけ動的読み込み
 - `.github/workflows/deploy.yml`: GitHub Pages用デプロイ設定
 
 外部ライブラリと外部サービス:
 
-- Leaflet `1.9.4`
+- Leaflet `1.9.4`（`vendor/leaflet/`に自前ホスト。地図ピッカーを開いた時だけ動的読み込み）
 - OpenStreetMapタイル
 - Nominatim Reverse Geocoding
 - Google Maps
@@ -316,12 +317,15 @@ IndexedDBをメイン保存先へ変更する場合は、移行処理、戻し�
 1. localStorage JSON解析
 2. 全件ソート
 3. 50件DOM生成
-4. 外部Leaflet読込
-5. ネットワークからの静的ファイル読込
+4. ネットワークからの静的ファイル読込
+
+解消済み（20260726-leaflet-lazy1）:
+
+- 起動時のLeaflet読込（地図ピッカーを開いた時だけ`vendor/leaflet/`から動的読み込みへ変更）
 
 ---
 
-## Service Worker設計 20260718-speed2
+## Service Worker設計 20260726-leaflet-lazy1
 
 ### 目的
 
@@ -331,7 +335,7 @@ IndexedDBをメイン保存先へ変更する場合は、移行処理、戻し�
 
 ### キャッシュ識別子
 
-`visit-manager-v20260718-speed2`
+`visit-manager-v20260726-leaflet-lazy1`
 
 ### キャッシュ対象
 
@@ -341,7 +345,7 @@ IndexedDBをメイン保存先へ変更する場合は、移行処理、戻し�
 - バージョン付きCSS
 - バージョン付きJavaScript
 - PWAアイコン
-- Leaflet 1.9.4のCSSとJavaScript
+- 自前ホストのLeaflet 1.9.4のCSS・JavaScript・マーカー画像（`vendor/leaflet/`。同一オリジンの静的ファイルとしてキャッシュ対象に含まれる）
 
 ### キャッシュ禁止
 
@@ -545,7 +549,6 @@ Service Workerだけを更新するホットフィックスは例外とし、ド
 1. 起動時間の実測ログ
 2. 実データ件数・localStorage容量の診断表示
 3. iPhone実機で今回のキャッシュ効果確認
-4. 初回起動時のLeaflet遅延読込
 
 高優先:
 

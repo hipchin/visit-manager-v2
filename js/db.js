@@ -16,8 +16,8 @@ window.DB = (() => {
     version: 'vm_version'
   };
 
-  // version.json と app.js の整合を維持するホットフィックスのため変更しない。
-  const APP_VERSION = '1.0.11';
+  // version.json、app.jsのAPP_BUILD_IDと揃えて更新する。
+  const APP_VERSION = '1.0.12';
 
   const UNLOADED = Symbol('unloaded');
   let visitsCache = UNLOADED;

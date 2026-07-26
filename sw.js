@@ -7,25 +7,32 @@
 // - Nominatim、OpenStreetMapタイル、Google Mapsはキャッシュ対象外
 // - 更新の適用は既存仕様どおり「更新して再起動」操作で行う
 
-const CACHE_VERSION = 'visit-manager-v20260718-speed2';
+const CACHE_VERSION = 'visit-manager-v20260726-leaflet-lazy1';
 const CACHE_PREFIX = 'visit-manager-';
 
 const APP_SHELL_URL = './';
 const INDEX_URL = './index.html';
 
 // 現在のindex.htmlが読み込むURLと一致させる。
-// アプリ内部バージョンは1.0.11のまま維持するホットフィックス。
+// 20260726-leaflet-lazy1: Leafletは起動時に読み込まないためindex.htmlの
+// スクリプトタグからは外れたが、地図ピッカーを開いた際の初回読込を速くする
+// ため、自前ホスト版としてアプリシェルに含めてプリキャッシュする。
 const APP_SHELL_FILES = [
   './',
   './index.html',
   './manifest.json',
-  './css/style.css?v=20260711-iosfix1',
-  './js/db.js?v=20260711-iosfix1',
-  './js/tags.js?v=20260711-iosfix1',
-  './js/ui.js?v=20260711-iosfix1',
-  './js/app.js?v=20260711-iosfix1',
+  './css/style.css?v=20260726-leaflet-lazy1',
+  './js/db.js?v=20260726-leaflet-lazy1',
+  './js/tags.js?v=20260726-leaflet-lazy1',
+  './js/ui.js?v=20260726-leaflet-lazy1',
+  './js/app.js?v=20260726-leaflet-lazy1',
   './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-512.png',
+  './vendor/leaflet/leaflet.css?v=20260726-leaflet-lazy1',
+  './vendor/leaflet/leaflet.js?v=20260726-leaflet-lazy1',
+  './vendor/leaflet/images/marker-icon.png',
+  './vendor/leaflet/images/marker-icon-2x.png',
+  './vendor/leaflet/images/marker-shadow.png'
 ];
 
 self.addEventListener('install', event => {
@@ -89,18 +96,9 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 同一オリジンの静的ファイルを高速化する。
-  if (url.origin === self.location.origin && isStaticAsset(url.pathname)) {
-    event.respondWith(cacheFirstWithBackgroundRefresh(event, request));
-    return;
-  }
-
-  // Leaflet CDNだけは2回目以降の起動を高速化する。
+  // 同一オリジンの静的ファイル（自前ホストのLeafletを含む）を高速化する。
   // 地図タイルと住所検索APIは保存容量増大を避けるため対象外。
-  if (
-    url.origin === 'https://unpkg.com' &&
-    url.pathname.includes('/leaflet@1.9.4/')
-  ) {
+  if (url.origin === self.location.origin && isStaticAsset(url.pathname)) {
     event.respondWith(cacheFirstWithBackgroundRefresh(event, request));
   }
 });
