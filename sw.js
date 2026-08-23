@@ -7,23 +7,22 @@
 // - Nominatim、OpenStreetMapタイル、Google Mapsはキャッシュ対象外
 // - 更新の適用は既存仕様どおり「更新して再起動」操作で行う
 
-const CACHE_VERSION = 'visit-manager-v20260718-speed2';
+const CACHE_VERSION = 'visit-manager-v20260823-visitcount1';
 const CACHE_PREFIX = 'visit-manager-';
 
 const APP_SHELL_URL = './';
 const INDEX_URL = './index.html';
 
 // 現在のindex.htmlが読み込むURLと一致させる。
-// アプリ内部バージョンは1.0.11のまま維持するホットフィックス。
 const APP_SHELL_FILES = [
   './',
   './index.html',
   './manifest.json',
-  './css/style.css?v=20260711-iosfix1',
-  './js/db.js?v=20260711-iosfix1',
-  './js/tags.js?v=20260711-iosfix1',
-  './js/ui.js?v=20260711-iosfix1',
-  './js/app.js?v=20260711-iosfix1',
+  './css/style.css?v=20260823-visitcount1',
+  './js/db.js?v=20260823-visitcount1',
+  './js/tags.js?v=20260823-visitcount1',
+  './js/ui.js?v=20260823-visitcount1',
+  './js/app.js?v=20260823-visitcount1',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];

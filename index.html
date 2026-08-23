@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="css/style.css?v=20260711-iosfix1">
+  <link rel="stylesheet" href="css/style.css?v=20260823-visitcount1">
   <script>
     // ?debug=1 を付けた時だけ、iPhone Safari上にJSエラーを表示する
     (function () {
@@ -217,6 +217,20 @@
       </section>
 
       <section class="settings-section">
+        <h2 class="settings-section-title">表示設定</h2>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-label">
+            <span class="settings-toggle-title">訪問件数の入力</span>
+            <span class="settings-desc">訪問記録に、その日訪問した件数を入力する欄を表示します</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="setting-visit-count-enabled">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="settings-section">
         <h2 class="settings-section-title">バックアップ</h2>
         <div class="backup-info">
           <p class="backup-last" id="backup-last-text">最終バックアップ：なし</p>
@@ -290,6 +304,10 @@
           <button class="time-chip" data-value="evening" type="button">夕方</button>
           <button class="time-chip" data-value="night" type="button">夜</button>
         </div>
+        <div class="form-section visit-count-row hidden" id="visit-count-row">
+          <label class="form-label" style="margin-top:12px;">件数</label>
+          <input type="number" id="visit-count" class="form-input" inputmode="numeric" min="0" step="1" placeholder="任意">
+        </div>
         <label class="form-label" style="margin-top:12px;">メモ</label>
         <textarea id="visit-memo" class="form-textarea" rows="3" placeholder="会話内容など"></textarea>
       </div>
@@ -360,9 +378,9 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="js/db.js?v=20260711-iosfix1"></script>
-  <script src="js/tags.js?v=20260711-iosfix1"></script>
-  <script src="js/ui.js?v=20260711-iosfix1"></script>
-  <script src="js/app.js?v=20260711-iosfix1"></script>
+  <script src="js/db.js?v=20260823-visitcount1"></script>
+  <script src="js/tags.js?v=20260823-visitcount1"></script>
+  <script src="js/ui.js?v=20260823-visitcount1"></script>
+  <script src="js/app.js?v=20260823-visitcount1"></script>
 </body>
 </html>

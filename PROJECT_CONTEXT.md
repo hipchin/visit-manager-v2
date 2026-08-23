@@ -149,6 +149,7 @@
 
 ### 設定画面
 
+- 表示設定: 訪問記録モーダルの訪問件数入力欄をオン・オフするトグル（`setting-visit-count-enabled`）
 - タグ追加・編集・削除
 - JSONバックアップ保存
 - JSONバックアップ復元
@@ -163,7 +164,7 @@
 
 - タグ選択: `modal-tag-picker`
 - タグ追加・編集: `modal-add-tag`
-- 訪問記録: `modal-visit`
+- 訪問記録: `modal-visit`（日付・時間帯とは別に任意の件数入力欄`visit-count`あり。設定のトグルで表示切替）
 - 不在記録: `modal-absent`
 - 場所選択: `modal-location-picker`
 - 確認ダイアログ: `modal-confirm`
@@ -187,6 +188,7 @@
 - `vm_backup_date`
 - `vm_version`
 - `vm_last_trash_purge`
+- `vm_settings`（訪問件数入力欄の表示オン・オフなど。端末内設定のみで、JSONバックアップの対象外）
 
 絶対禁止:
 

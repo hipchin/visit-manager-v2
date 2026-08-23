@@ -13,17 +13,18 @@ window.DB = (() => {
     trash: 'vm_trash',
     tags: 'vm_tags',
     backupDate: 'vm_backup_date',
-    version: 'vm_version'
+    version: 'vm_version',
+    settings: 'vm_settings'
   };
 
-  // version.json と app.js の整合を維持するホットフィックスのため変更しない。
-  const APP_VERSION = '1.0.11';
+  const APP_VERSION = '1.1.0';
 
   const UNLOADED = Symbol('unloaded');
   let visitsCache = UNLOADED;
   let trashCache = UNLOADED;
   let tagsCache = UNLOADED;
   let backupDateCache = UNLOADED;
+  let settingsCache = UNLOADED;
 
   function load(key, fallback) {
     try {
@@ -84,6 +85,14 @@ window.DB = (() => {
     return Array.isArray(value) ? value.map(tag => ({ ...tag })) : fallback;
   }
 
+  function normalizeSettings(value) {
+    const fallback = { visitCountEnabled: false };
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+      visitCountEnabled: source.visitCountEnabled === true ? true : fallback.visitCountEnabled
+    };
+  }
+
   function ensureVisitsLoaded() {
     if (visitsCache === UNLOADED) {
       visitsCache = normalizeVisits(load(KEYS.visits, []));
@@ -103,6 +112,13 @@ window.DB = (() => {
       tagsCache = normalizeTags(load(KEYS.tags, null));
     }
     return tagsCache;
+  }
+
+  function ensureSettingsLoaded() {
+    if (settingsCache === UNLOADED) {
+      settingsCache = normalizeSettings(load(KEYS.settings, null));
+    }
+    return settingsCache;
   }
 
   function getVisits() {
@@ -226,6 +242,18 @@ window.DB = (() => {
     saveVisits(visits);
   }
 
+  // settings
+  function getSettings() {
+    return { ...ensureSettingsLoaded() };
+  }
+
+  function saveSettings(settings) {
+    const normalized = normalizeSettings({ ...ensureSettingsLoaded(), ...settings });
+    save(KEYS.settings, normalized);
+    settingsCache = normalized;
+    return normalized;
+  }
+
   // backup
   function getBackupDate() {
     if (backupDateCache === UNLOADED) {
@@ -308,6 +336,7 @@ window.DB = (() => {
     getVisits, saveVisits, addVisit, updateVisit, getVisitById,
     getTrash, moveToTrash, restoreFromTrash, purgeExpiredTrash,
     getTags, saveTags, addTag, updateTag, deleteTag,
+    getSettings, saveSettings,
     getBackupDate, setBackupDate,
     exportData, importData,
     snapshotToIndexedDB,

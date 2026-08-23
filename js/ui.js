@@ -604,6 +604,13 @@ window.UI = (() => {
   // ===== 訪問履歴 =====
   let visitHistory = [];
   let editingHistoryIndex = null;
+  let visitCountEnabled = false;
+
+  function setVisitCountEnabled(enabled) {
+    visitCountEnabled = !!enabled;
+    document.getElementById('visit-count-row').classList.toggle('hidden', !visitCountEnabled);
+    renderVisitHistory(visitHistory);
+  }
 
   function renderVisitHistory(history) {
     visitHistory = history.slice();
@@ -636,6 +643,7 @@ window.UI = (() => {
     sorted.forEach(({ item, index }) => {
       const el = document.createElement('div');
       const metVisitCount = metVisitCountMap.get(index);
+      const showCount = visitCountEnabled && !item.absent && item.count !== undefined && item.count !== null && item.count !== '';
       el.className = 'history-item' + (item.absent ? ' absent' : ' met');
       el.innerHTML = `
         <div class="history-item-main">
@@ -644,6 +652,7 @@ window.UI = (() => {
             <span class="history-date">${item.absent ? '🚪 ' : ''}${window.formatDate(item.date)}</span>
             <span class="history-time">${item.absent ? '不在' : (window.timeLabel(item.time) || '時間帯未設定')}</span>
           </div>
+          ${showCount ? `<div class="history-item-top"><span class="history-visit-count">件数：${escapeHtml(String(item.count))}件</span></div>` : ''}
           ${item.memo ? `<div class="history-memo">${escapeHtml(item.memo)}</div>` : ''}
         </div>
         <div class="history-actions">
@@ -666,6 +675,7 @@ window.UI = (() => {
     document.querySelectorAll('#visit-time-options .time-chip').forEach(c => {
       c.classList.toggle('selected', !!item && c.dataset.value === item.time);
     });
+    document.getElementById('visit-count').value = item && (item.count || item.count === 0) ? item.count : '';
     document.getElementById('visit-memo').value = item && item.memo ? item.memo : '';
     document.getElementById('modal-visit').classList.remove('hidden');
   }
@@ -677,9 +687,12 @@ window.UI = (() => {
 
   function getVisitFormData() {
     const selectedTime = document.querySelector('#visit-time-options .time-chip.selected');
+    const countRaw = document.getElementById('visit-count').value.trim();
+    const count = countRaw === '' ? null : Number(countRaw);
     return {
       date: document.getElementById('visit-date').value,
       time: selectedTime ? selectedTime.dataset.value : '',
+      count: Number.isFinite(count) ? count : null,
       memo: document.getElementById('visit-memo').value.trim()
     };
   }
@@ -727,6 +740,7 @@ window.UI = (() => {
     document.getElementById('backup-last-text').textContent =
       '最終バックアップ：' + (backupDate ? window.formatDate(backupDate) : 'なし');
     document.getElementById('version-text').textContent = 'v' + window.DB.getVersion();
+    document.getElementById('setting-visit-count-enabled').checked = window.DB.getSettings().visitCountEnabled;
   }
 
   function renderTagsManage() {
@@ -827,7 +841,7 @@ window.UI = (() => {
     useCurrentLocation, openLocationPicker, closeLocationPicker, movePickerToCurrentLocation, usePickedLocation,
     renderSelectedTags, getSelectedTagIds,
     openTagPicker, closeTagPicker,
-    renderVisitHistory, getVisitHistory, openVisitModal, closeVisitModal,
+    renderVisitHistory, getVisitHistory, openVisitModal, closeVisitModal, setVisitCountEnabled,
     getVisitFormData, openAbsentModal, closeAbsentModal, getAbsentFormData,
     saveVisitHistoryItem, deleteVisitHistoryItem,
     openAddTagModal, closeAddTagModal, getNewTagData, getEditingTagId,

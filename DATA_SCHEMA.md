@@ -9,6 +9,7 @@
   vm_tags          タグ
   vm_backup_date   最終バックアップ日時
   vm_version       バージョン
+  vm_settings      表示設定（訪問件数入力欄のオン・オフ等。JSONバックアップ対象外）
 
 ## 訪問先レコード
 
@@ -28,6 +29,14 @@
 -   visitHistory\[\]
 -   createdAt
 -   updatedAt
+
+## visitHistory の要素
+
+-   date
+-   time（不在の場合は未使用）
+-   count（任意。時間帯とは別入力の訪問件数。設定でオン時のみ入力・表示）
+-   memo
+-   absent（不在記録の場合true）
 
 ## ゴミ箱
 

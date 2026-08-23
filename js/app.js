@@ -8,7 +8,7 @@
   const LIST_INITIAL_LIMIT = 50;
   const LIST_MORE_LIMIT = 50;
   const TRASH_PURGE_KEY = 'vm_last_trash_purge';
-  const APP_BUILD_ID = '20260711-iosfix1';
+  const APP_BUILD_ID = '20260823-visitcount1';
 
   // ===== 初期化 =====
   function init() {
@@ -17,9 +17,14 @@
     safeRun('patchOptimizedListRenderer', patchOptimizedListRenderer);
     safeRun('migrateLegacyDemoData', migrateLegacyDemoData);
     safeRun('insertDemoData', insertDemoData);
+    safeRun('applyVisitCountSetting', applyVisitCountSetting);
     safeRun('renderList', renderList);
     safeRun('registerSW', registerSW);
     schedulePostStartupTasks();
+  }
+
+  function applyVisitCountSetting() {
+    window.UI.setVisitCountEnabled(window.DB.getSettings().visitCountEnabled);
   }
 
   function safeRun(label, fn) {
@@ -537,6 +542,12 @@
         renderList();
         window.UI.toast('復元しました');
       }
+    });
+
+    // 設定：訪問件数入力欄の表示切替
+    document.getElementById('setting-visit-count-enabled').addEventListener('change', e => {
+      window.DB.saveSettings({ visitCountEnabled: e.target.checked });
+      window.UI.setVisitCountEnabled(e.target.checked);
     });
 
     // 設定：タグ追加・編集

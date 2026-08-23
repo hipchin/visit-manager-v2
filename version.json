@@ -1,6 +1,6 @@
 {
-  "buildId": "20260711-iosfix1",
-  "appVersion": "1.0.11",
-  "releasedAt": "2026-07-11",
-  "notes": "Googleマップ復帰時の白画面とiPhoneバックアップ保存画面を改善"
+  "buildId": "20260823-visitcount1",
+  "appVersion": "1.1.0",
+  "releasedAt": "2026-08-23",
+  "notes": "訪問記録に件数入力欄を追加し、設定画面で表示のオン・オフを切り替えられるようにしました"
 }
