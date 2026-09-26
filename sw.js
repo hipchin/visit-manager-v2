@@ -7,7 +7,7 @@
 // - Nominatim、OpenStreetMapタイル、Google Mapsはキャッシュ対象外
 // - 更新の適用は既存仕様どおり「更新して再起動」操作で行う
 
-const CACHE_VERSION = 'visit-manager-v20260926-ui4';
+const CACHE_VERSION = 'visit-manager-v20260926-ui5';
 const CACHE_PREFIX = 'visit-manager-';
 
 const APP_SHELL_URL = './';
@@ -19,11 +19,11 @@ const APP_SHELL_FILES = [
   './',
   './index.html',
   './manifest.json',
-  './css/style.css?v=20260926-ui4',
-  './js/db.js?v=20260926-ui4',
-  './js/tags.js?v=20260926-ui4',
-  './js/ui.js?v=20260926-ui4',
-  './js/app.js?v=20260926-ui4',
+  './css/style.css?v=20260926-ui5',
+  './js/db.js?v=20260926-ui5',
+  './js/tags.js?v=20260926-ui5',
+  './js/ui.js?v=20260926-ui5',
+  './js/app.js?v=20260926-ui5',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];

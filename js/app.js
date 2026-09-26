@@ -8,7 +8,7 @@
   const LIST_INITIAL_LIMIT = 50;
   const LIST_MORE_LIMIT = 50;
   const TRASH_PURGE_KEY = 'vm_last_trash_purge';
-  const APP_BUILD_ID = '20260926-ui4';
+  const APP_BUILD_ID = '20260926-ui5';
   const UPDATE_RESULT_KEY = 'vm_update_result';
 
   // ===== 初期化 =====
@@ -845,10 +845,12 @@
   }
 
   async function checkForAppUpdate(manual, applyWhenAvailable = false) {
+    const feedbackStartedAt = Date.now();
     if (manual) setUpdateState('checking');
     try {
       const res = await fetch('./version.json?ts=' + Date.now(), { cache: 'no-store' });
       if (!res.ok) {
+        if (manual) await waitForUpdateFeedback(feedbackStartedAt);
         if (manual) setUpdateState('error', '更新を確認できませんでした。通信状態を確認して、もう一度お試しください。');
         return;
       }
@@ -856,22 +858,31 @@
       const data = await res.json();
       const latestBuildId = data && data.buildId ? String(data.buildId) : '';
       if (!latestBuildId) {
+        if (manual) await waitForUpdateFeedback(feedbackStartedAt);
         if (manual) setUpdateState('error', 'バージョン情報を確認できませんでした。');
         return;
       }
 
       if (latestBuildId !== APP_BUILD_ID) {
+        if (manual) await waitForUpdateFeedback(feedbackStartedAt);
         const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
         showAppUpdateNotice(reg, latestBuildId);
         if (manual && applyWhenAvailable) await triggerAppUpdate(true, latestBuildId);
         return;
       }
 
+      if (manual) await waitForUpdateFeedback(feedbackStartedAt);
       if (manual) setUpdateState('latest');
     } catch (err) {
       console.warn('app update check failed', err);
+      if (manual) await waitForUpdateFeedback(feedbackStartedAt);
       if (manual) setUpdateState('error', '更新を確認できませんでした。通信状態を確認して、もう一度お試しください。');
     }
+  }
+
+  function waitForUpdateFeedback(startedAt, minimumMs = 650) {
+    const remaining = Math.max(0, minimumMs - (Date.now() - startedAt));
+    return new Promise(resolve => window.setTimeout(resolve, remaining));
   }
 
   async function triggerAppUpdate(manual, buildId = '') {
@@ -933,9 +944,17 @@
     if (settingsButton) {
       settingsButton.disabled = busy;
       settingsButton.setAttribute('aria-busy', String(busy));
-      settingsButton.textContent = state === 'checking' ? '確認中…'
-        : state === 'updating' || state === 'restarting' ? '更新中…'
-          : '最新版を確認';
+      settingsButton.classList.toggle('is-working', busy);
+      settingsButton.classList.toggle('is-success', state === 'latest' || state === 'complete');
+      settingsButton.innerHTML = state === 'checking'
+        ? '<span class="button-spinner" aria-hidden="true"></span><span>確認しています…</span>'
+        : state === 'updating'
+          ? '<span class="button-spinner" aria-hidden="true"></span><span>更新を準備中…</span>'
+          : state === 'restarting'
+            ? '<span class="button-spinner" aria-hidden="true"></span><span>再起動しています…</span>'
+            : state === 'latest' || state === 'complete'
+              ? '<span class="button-check" aria-hidden="true">✓</span><span>確認済み</span>'
+              : state === 'error' ? '<span>もう一度確認</span>' : '<span>最新版を確認</span>';
     }
 
     if (status) {
@@ -953,7 +972,10 @@
     if (noticeButton) {
       noticeButton.disabled = busy;
       noticeButton.setAttribute('aria-busy', String(busy));
-      noticeButton.textContent = busy ? '更新中…' : '更新して再起動';
+      noticeButton.classList.toggle('is-working', busy);
+      noticeButton.innerHTML = busy
+        ? '<span class="button-spinner" aria-hidden="true"></span><span>更新中…</span>'
+        : '<span>更新して再起動</span>';
     }
     if (noticeText && (state === 'updating' || state === 'restarting')) {
       noticeText.textContent = state === 'restarting' ? '更新完了。再起動します' : '最新版を準備しています…';
