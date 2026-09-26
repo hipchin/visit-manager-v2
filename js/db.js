@@ -16,7 +16,7 @@ window.DB = (() => {
     version: 'vm_version'
   };
 
-  const APP_VERSION = '1.1.1';
+  const APP_VERSION = '1.1.2';
 
   const UNLOADED = Symbol('unloaded');
   let visitsCache = UNLOADED;

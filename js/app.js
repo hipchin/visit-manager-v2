@@ -8,7 +8,8 @@
   const LIST_INITIAL_LIMIT = 50;
   const LIST_MORE_LIMIT = 50;
   const TRASH_PURGE_KEY = 'vm_last_trash_purge';
-  const APP_BUILD_ID = '20260926-ui3';
+  const APP_BUILD_ID = '20260926-ui4';
+  const UPDATE_RESULT_KEY = 'vm_update_result';
 
   // ===== 初期化 =====
   function init() {
@@ -18,6 +19,7 @@
     safeRun('migrateLegacyDemoData', migrateLegacyDemoData);
     safeRun('insertDemoData', insertDemoData);
     safeRun('renderList', renderList);
+    safeRun('restoreUpdateResult', restoreUpdateResult);
     safeRun('registerSW', registerSW);
     schedulePostStartupTasks();
   }
@@ -687,7 +689,7 @@
 
     // 手動アップデート
     document.getElementById('btn-update').addEventListener('click', () => {
-      triggerAppUpdate(true);
+      checkForAppUpdate(true, true);
     });
 
     // 検索
@@ -828,7 +830,7 @@
     watchedServiceWorkerRegistrations.add(reg);
 
     if (reg.waiting && navigator.serviceWorker.controller) {
-      showAppUpdateNotice(reg, APP_BUILD_ID);
+      checkForAppUpdate(false);
     }
 
     reg.addEventListener('updatefound', () => {
@@ -836,45 +838,49 @@
       if (!worker) return;
       worker.addEventListener('statechange', () => {
         if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-          showAppUpdateNotice(reg, APP_BUILD_ID);
+          checkForAppUpdate(false);
         }
       });
     });
   }
 
-  async function checkForAppUpdate(manual) {
+  async function checkForAppUpdate(manual, applyWhenAvailable = false) {
+    if (manual) setUpdateState('checking');
     try {
       const res = await fetch('./version.json?ts=' + Date.now(), { cache: 'no-store' });
       if (!res.ok) {
-        if (manual) window.UI.toast('バージョン確認に失敗しました');
+        if (manual) setUpdateState('error', '更新を確認できませんでした。通信状態を確認して、もう一度お試しください。');
         return;
       }
 
       const data = await res.json();
       const latestBuildId = data && data.buildId ? String(data.buildId) : '';
       if (!latestBuildId) {
-        if (manual) window.UI.toast('バージョン情報が空です');
+        if (manual) setUpdateState('error', 'バージョン情報を確認できませんでした。');
         return;
       }
 
       if (latestBuildId !== APP_BUILD_ID) {
         const reg = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
         showAppUpdateNotice(reg, latestBuildId);
+        if (manual && applyWhenAvailable) await triggerAppUpdate(true, latestBuildId);
         return;
       }
 
-      if (manual) window.UI.toast('すでに最新バージョンです');
+      if (manual) setUpdateState('latest');
     } catch (err) {
       console.warn('app update check failed', err);
-      if (manual) window.UI.toast('更新確認に失敗しました');
+      if (manual) setUpdateState('error', '更新を確認できませんでした。通信状態を確認して、もう一度お試しください。');
     }
   }
 
-  async function triggerAppUpdate(manual) {
-    pendingUpdateBuildId = pendingUpdateBuildId || APP_BUILD_ID;
+  async function triggerAppUpdate(manual, buildId = '') {
+    pendingUpdateBuildId = buildId || pendingUpdateBuildId || APP_BUILD_ID;
+    setUpdateState('updating');
 
     try {
       if (!('serviceWorker' in navigator)) {
+        prepareUpdateReload();
         reloadWithBuildParam(pendingUpdateBuildId);
         return;
       }
@@ -887,6 +893,7 @@
       await reg.update();
 
       if (reg.waiting) {
+        prepareUpdateReload();
         reg.waiting.postMessage({ type: 'SKIP_WAITING' });
         window.setTimeout(() => reloadWithBuildParam(pendingUpdateBuildId), 900);
         return;
@@ -895,21 +902,94 @@
       if (reg.installing) {
         reg.installing.addEventListener('statechange', () => {
           if (reg.waiting) {
+            prepareUpdateReload();
             reg.waiting.postMessage({ type: 'SKIP_WAITING' });
             window.setTimeout(() => reloadWithBuildParam(pendingUpdateBuildId), 900);
           }
         });
-        window.setTimeout(() => reloadWithBuildParam(pendingUpdateBuildId), 1400);
+        window.setTimeout(() => {
+          prepareUpdateReload();
+          reloadWithBuildParam(pendingUpdateBuildId);
+        }, 1800);
         return;
       }
 
-      await checkForAppUpdate(manual);
-      if (!manual) return;
+      prepareUpdateReload();
       reloadWithBuildParam(pendingUpdateBuildId);
     } catch (err) {
       console.warn('app update failed', err);
-      if (manual) window.UI.toast('更新処理に失敗しました。再読み込みします');
-      reloadWithBuildParam(pendingUpdateBuildId);
+      if (manual) setUpdateState('error', '更新できませんでした。通信状態を確認して、もう一度お試しください。');
+    }
+  }
+
+  function setUpdateState(state, message = '') {
+    const settingsButton = document.getElementById('btn-update');
+    const status = document.getElementById('update-status');
+    const notice = document.getElementById('app-update-notice');
+    const noticeText = notice && notice.querySelector('.app-update-notice-text');
+    const noticeButton = document.getElementById('btn-apply-update');
+    const busy = state === 'checking' || state === 'updating' || state === 'restarting';
+
+    if (settingsButton) {
+      settingsButton.disabled = busy;
+      settingsButton.setAttribute('aria-busy', String(busy));
+      settingsButton.textContent = state === 'checking' ? '確認中…'
+        : state === 'updating' || state === 'restarting' ? '更新中…'
+          : '最新版を確認';
+    }
+
+    if (status) {
+      status.classList.toggle('success', state === 'latest' || state === 'complete');
+      status.classList.toggle('error', state === 'error');
+      status.textContent = message || ({
+        checking: '最新版を確認しています…',
+        updating: '最新版を準備しています。このままお待ちください…',
+        restarting: '更新が完了しました。再起動しています…',
+        latest: `最新版です（v${window.DB.getVersion()}）`,
+        complete: `最新版に更新しました（v${window.DB.getVersion()}）`
+      }[state] || '');
+    }
+
+    if (noticeButton) {
+      noticeButton.disabled = busy;
+      noticeButton.setAttribute('aria-busy', String(busy));
+      noticeButton.textContent = busy ? '更新中…' : '更新して再起動';
+    }
+    if (noticeText && (state === 'updating' || state === 'restarting')) {
+      noticeText.textContent = state === 'restarting' ? '更新完了。再起動します' : '最新版を準備しています…';
+    }
+  }
+
+  function prepareUpdateReload() {
+    setUpdateState('restarting');
+    const activeScreen = document.querySelector('.screen.active');
+    const returnScreen = activeScreen && activeScreen.id === 'screen-settings' ? 'settings' : 'list';
+    try {
+      sessionStorage.setItem(UPDATE_RESULT_KEY, JSON.stringify({
+        buildId: pendingUpdateBuildId || APP_BUILD_ID,
+        returnScreen
+      }));
+    } catch (_) {
+      // sessionStorageが使えない場合も更新自体は続行する。
+    }
+  }
+
+  function restoreUpdateResult() {
+    try {
+      const raw = sessionStorage.getItem(UPDATE_RESULT_KEY);
+      if (!raw) return;
+      const result = JSON.parse(raw);
+      if (!result || result.buildId !== APP_BUILD_ID) return;
+      sessionStorage.removeItem(UPDATE_RESULT_KEY);
+
+      if (result.returnScreen === 'settings') {
+        window.UI.renderSettings();
+        window.UI.showScreen('settings');
+      }
+      setUpdateState('complete');
+      window.setTimeout(() => window.UI.toast('最新版に更新しました'), 150);
+    } catch (err) {
+      console.warn('update result restore failed', err);
     }
   }
 
@@ -932,7 +1012,7 @@
     const btn = document.getElementById('btn-apply-update');
     if (btn && !btn.dataset.bound) {
       btn.dataset.bound = '1';
-      btn.addEventListener('click', () => triggerAppUpdate(true));
+      btn.addEventListener('click', () => triggerAppUpdate(true, pendingUpdateBuildId));
     }
 
   }
