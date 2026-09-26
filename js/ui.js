@@ -26,6 +26,12 @@ window.UI = (() => {
       .replace(/'/g, '&#039;');
   }
 
+  function todayInputValue() {
+    const now = new Date();
+    const localNow = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    return localNow.toISOString().slice(0, 10);
+  }
+
   function toNumberOrNull(value) {
     if (value === null || value === undefined || String(value).trim() === '') {
       return null;
@@ -244,6 +250,7 @@ window.UI = (() => {
 
   // ===== フォームへの流し込み =====
   function fillForm(entry) {
+    const isEdit = !!entry.id;
     document.getElementById('field-id').value = entry.id || '';
     document.getElementById('field-address').value = entry.address || '';
     document.getElementById('field-display-title').value = entry.displayTitle || '';
@@ -255,7 +262,7 @@ window.UI = (() => {
 
     document.getElementById('field-name').value = entry.name || '';
     document.getElementById('field-gender').value = entry.gender || '';
-    document.getElementById('field-last-visit').value = entry.lastVisit || '';
+    document.getElementById('field-last-visit').value = entry.lastVisit || (isEdit ? '' : todayInputValue());
     document.getElementById('field-memo').value = entry.memo || '';
 
     document.querySelectorAll('#time-options .time-chip').forEach(chip => {
@@ -267,7 +274,6 @@ window.UI = (() => {
     renderSelectedTags(entry.tags || []);
     renderVisitHistory(entry.visitHistory || []);
 
-    const isEdit = !!entry.id;
     document.getElementById('detail-title').textContent = isEdit
       ? ((entry.address || '').trim() || (entry.displayTitle || '').trim() || '詳細・編集')
       : '新規登録';
@@ -677,7 +683,7 @@ window.UI = (() => {
 
   function openVisitModal(item = null, index = null) {
     editingHistoryIndex = Number.isInteger(index) ? index : null;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInputValue();
     document.getElementById('visit-modal-title').textContent = editingHistoryIndex === null ? '会えたと記録' : '訪問を編集';
     document.getElementById('btn-save-visit').textContent = editingHistoryIndex === null ? '記録する' : '更新する';
     document.getElementById('visit-date').value = item && item.date ? item.date : today;
@@ -706,7 +712,7 @@ window.UI = (() => {
 
   function openAbsentModal(item = null, index = null) {
     editingHistoryIndex = Number.isInteger(index) ? index : null;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInputValue();
     document.getElementById('absent-modal-title').textContent = editingHistoryIndex === null ? '不在を記録' : '不在を編集';
     document.getElementById('btn-save-absent').textContent = editingHistoryIndex === null ? '記録する' : '更新する';
     document.getElementById('absent-date').value = item && item.date ? item.date : today;
