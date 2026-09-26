@@ -4,8 +4,8 @@
   "description": "飛び込み営業の訪問先を管理するアプリ",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "background_color": "#f5f7fb",
+  "theme_color": "#425872",
   "lang": "ja",
   "icons": [
     {

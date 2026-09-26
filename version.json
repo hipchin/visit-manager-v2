@@ -1,6 +1,6 @@
 {
-  "buildId": "20260711-iosfix1",
-  "appVersion": "1.0.11",
-  "releasedAt": "2026-07-11",
-  "notes": "Googleマップ復帰時の白画面とiPhoneバックアップ保存画面を改善"
+  "buildId": "20260926-ui2",
+  "appVersion": "1.1.0",
+  "releasedAt": "2026-09-26",
+  "notes": "訪問候補中心の新UI、即時記録、操作状態とモバイル表示を改善。既存データ形式は変更なし"
 }

@@ -70,6 +70,9 @@ window.UI = (() => {
       );
     }
 
+    const listCount = document.getElementById('list-count');
+    if (listCount) listCount.textContent = `${filtered.length}件`;
+
     // 最終訪問日が古い順
     filtered.sort((a, b) => {
       const da = a.lastVisit ? new Date(a.lastVisit).getTime() : 0;
@@ -78,9 +81,11 @@ window.UI = (() => {
     });
 
     if (filtered.length === 0) {
+      const isFiltered = !!searchQuery || (activeTagIds && activeTagIds.length > 0);
       container.innerHTML = `<div class="empty-state">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-        <p>訪問先がありません</p>
+        <p>${isFiltered ? '条件に合う訪問先がありません' : '訪問先がありません'}</p>
+        <span>${isFiltered ? '検索語やタグを変えてお試しください' : '「訪問先を追加」から最初の訪問先を登録できます'}</span>
       </div>`;
       return;
     }
@@ -144,9 +149,12 @@ window.UI = (() => {
         ${tagsHtml}
         <div class="card-bottom">
           <span class="card-date${isOverdue ? ' overdue' : ''}">${escapeHtml(lastStr)}</span>
-          <button class="card-map-btn" data-address="${encodeURIComponent(v.address || title || '')}" data-lat="${escapeHtml(lat)}" data-lng="${escapeHtml(lng)}" aria-label="マップで開く">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
-            マップ
+        </div>
+        <div class="card-quick-actions">
+          <button type="button" class="card-action-btn card-meet-btn" data-id="${escapeHtml(v.id)}">会えた</button>
+          <button type="button" class="card-action-btn card-absent-btn" data-id="${escapeHtml(v.id)}">不在</button>
+          <button class="card-map-btn" data-address="${encodeURIComponent(v.address || title || '')}" data-lat="${escapeHtml(lat)}" data-lng="${escapeHtml(lng)}" aria-label="${escapeHtml(title)}をマップで開く">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
           </button>
         </div>
       `;
@@ -251,14 +259,23 @@ window.UI = (() => {
     document.getElementById('field-memo').value = entry.memo || '';
 
     document.querySelectorAll('#time-options .time-chip').forEach(chip => {
-      chip.classList.toggle('selected', chip.dataset.value === entry.lastTime);
+      const selected = chip.dataset.value === entry.lastTime;
+      chip.classList.toggle('selected', selected);
+      chip.setAttribute('aria-pressed', String(selected));
     });
 
     renderSelectedTags(entry.tags || []);
     renderVisitHistory(entry.visitHistory || []);
 
     const isEdit = !!entry.id;
-    document.getElementById('detail-title').textContent = isEdit ? '詳細・編集' : '新規登録';
+    document.getElementById('detail-title').textContent = isEdit
+      ? ((entry.address || '').trim() || (entry.displayTitle || '').trim() || '詳細・編集')
+      : '新規登録';
+    const detailSubtitle = document.getElementById('detail-subtitle');
+    if (detailSubtitle) {
+      const parts = isEdit ? [entry.name, entry.displayTitle].filter(Boolean) : ['訪問先の情報'];
+      detailSubtitle.textContent = parts.join(' · ');
+    }
     document.getElementById('btn-delete-entry').classList.toggle('hidden', !isEdit);
     document.getElementById('visit-history-section').style.display = isEdit ? '' : 'none';
   }
@@ -578,7 +595,8 @@ window.UI = (() => {
     const list = document.getElementById('tag-picker-list');
     list.innerHTML = '';
     window.DB.getTags().forEach(tag => {
-      const item = document.createElement('div');
+      const item = document.createElement('button');
+      item.type = 'button';
       item.className = 'tag-picker-item';
       const isSelected = selectedTagIds.includes(tag.id);
       item.innerHTML = `
@@ -660,11 +678,13 @@ window.UI = (() => {
   function openVisitModal(item = null, index = null) {
     editingHistoryIndex = Number.isInteger(index) ? index : null;
     const today = new Date().toISOString().slice(0, 10);
-    document.getElementById('visit-modal-title').textContent = editingHistoryIndex === null ? '訪問を記録' : '訪問を編集';
-    document.getElementById('btn-save-visit').textContent = editingHistoryIndex === null ? '記録' : '更新';
+    document.getElementById('visit-modal-title').textContent = editingHistoryIndex === null ? '会えたと記録' : '訪問を編集';
+    document.getElementById('btn-save-visit').textContent = editingHistoryIndex === null ? '記録する' : '更新する';
     document.getElementById('visit-date').value = item && item.date ? item.date : today;
     document.querySelectorAll('#visit-time-options .time-chip').forEach(c => {
-      c.classList.toggle('selected', !!item && c.dataset.value === item.time);
+      const selected = !!item && c.dataset.value === item.time;
+      c.classList.toggle('selected', selected);
+      c.setAttribute('aria-pressed', String(selected));
     });
     document.getElementById('visit-memo').value = item && item.memo ? item.memo : '';
     document.getElementById('modal-visit').classList.remove('hidden');
@@ -688,7 +708,7 @@ window.UI = (() => {
     editingHistoryIndex = Number.isInteger(index) ? index : null;
     const today = new Date().toISOString().slice(0, 10);
     document.getElementById('absent-modal-title').textContent = editingHistoryIndex === null ? '不在を記録' : '不在を編集';
-    document.getElementById('btn-save-absent').textContent = editingHistoryIndex === null ? '記録' : '更新';
+    document.getElementById('btn-save-absent').textContent = editingHistoryIndex === null ? '記録する' : '更新する';
     document.getElementById('absent-date').value = item && item.date ? item.date : today;
     document.getElementById('absent-memo').value = item && item.memo ? item.memo : '';
     document.getElementById('modal-absent').classList.remove('hidden');
@@ -810,7 +830,9 @@ window.UI = (() => {
     window.DB.getTags().forEach(tag => {
       const isActive = activeTagIds.includes(tag.id);
       const chip = document.createElement('button');
+      chip.type = 'button';
       chip.className = 'tag-chip';
+      chip.setAttribute('aria-pressed', String(isActive));
       chip.style.background = isActive ? window.hexToRgba(tag.color, 0.85) : window.hexToRgba(tag.color, 0.12);
       chip.style.color = isActive ? '#fff' : tag.color;
       chip.textContent = tag.name;

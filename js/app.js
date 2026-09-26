@@ -8,7 +8,7 @@
   const LIST_INITIAL_LIMIT = 50;
   const LIST_MORE_LIMIT = 50;
   const TRASH_PURGE_KEY = 'vm_last_trash_purge';
-  const APP_BUILD_ID = '20260711-iosfix1';
+  const APP_BUILD_ID = '20260926-ui2';
 
   // ===== 初期化 =====
   function init() {
@@ -249,9 +249,12 @@
         ${tagsHtml}
         <div class="card-bottom">
           <span class="card-date${isOverdue ? ' overdue' : ''}">${escapeHtml(lastStr)}</span>
-          <button class="card-map-btn" data-address="${encodeURIComponent(v.address || title || '')}" data-lat="${escapeHtml(lat)}" data-lng="${escapeHtml(lng)}" aria-label="マップで開く">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
-            マップ
+        </div>
+        <div class="card-quick-actions">
+          <button type="button" class="card-action-btn card-meet-btn" data-id="${escapeHtml(v.id)}">会えた</button>
+          <button type="button" class="card-action-btn card-absent-btn" data-id="${escapeHtml(v.id)}">不在</button>
+          <button class="card-map-btn" data-address="${encodeURIComponent(v.address || title || '')}" data-lat="${escapeHtml(lat)}" data-lng="${escapeHtml(lng)}" aria-label="${escapeHtml(title)}をマップで開く">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
           </button>
         </div>
       `;
@@ -296,6 +299,8 @@
       const container = document.getElementById('visit-list');
       const tagMap = Object.fromEntries(tags.map(t => [t.id, t]));
       const filtered = buildFilteredVisits(visits, searchQueryValue, activeTagIdsValue);
+      const listCount = document.getElementById('list-count');
+      if (listCount) listCount.textContent = `${filtered.length}件`;
       const signature = [
         visits.length,
         filtered.length,
@@ -310,9 +315,11 @@
       }
 
       if (filtered.length === 0) {
+        const isFiltered = !!searchQueryValue || (activeTagIdsValue && activeTagIdsValue.length > 0);
         container.innerHTML = `<div class="empty-state">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-          <p>訪問先がありません</p>
+          <p>${isFiltered ? '条件に合う訪問先がありません' : '訪問先がありません'}</p>
+          <span>${isFiltered ? '検索語やタグを変えてお試しください' : '「訪問先を追加」から最初の訪問先を登録できます'}</span>
         </div>`;
         return;
       }
@@ -384,10 +391,21 @@
 
       const card = e.target.closest('.visit-card');
       const mapBtn = e.target.closest('.card-map-btn');
+      const meetBtn = e.target.closest('.card-meet-btn');
+      const absentBtn = e.target.closest('.card-absent-btn');
       if (mapBtn) {
         e.stopPropagation();
         const addr = decodeURIComponent(mapBtn.dataset.address || '');
         openMap(addr, mapBtn.dataset.lat, mapBtn.dataset.lng);
+        return;
+      }
+      if (meetBtn || absentBtn) {
+        e.stopPropagation();
+        const entry = window.DB.getVisitById((meetBtn || absentBtn).dataset.id);
+        if (!entry) return;
+        window.UI.fillForm(entry);
+        if (meetBtn) window.UI.openVisitModal();
+        else window.UI.openAbsentModal();
         return;
       }
       if (card) {
@@ -457,8 +475,14 @@
     document.querySelectorAll('#time-options .time-chip').forEach(chip => {
       chip.addEventListener('click', () => {
         const wasSelected = chip.classList.contains('selected');
-        document.querySelectorAll('#time-options .time-chip').forEach(c => c.classList.remove('selected'));
-        if (!wasSelected) chip.classList.add('selected');
+        document.querySelectorAll('#time-options .time-chip').forEach(c => {
+          c.classList.remove('selected');
+          c.setAttribute('aria-pressed', 'false');
+        });
+        if (!wasSelected) {
+          chip.classList.add('selected');
+          chip.setAttribute('aria-pressed', 'true');
+        }
       });
     });
 
@@ -466,8 +490,14 @@
     document.querySelectorAll('#visit-time-options .time-chip').forEach(chip => {
       chip.addEventListener('click', () => {
         const wasSelected = chip.classList.contains('selected');
-        document.querySelectorAll('#visit-time-options .time-chip').forEach(c => c.classList.remove('selected'));
-        if (!wasSelected) chip.classList.add('selected');
+        document.querySelectorAll('#visit-time-options .time-chip').forEach(c => {
+          c.classList.remove('selected');
+          c.setAttribute('aria-pressed', 'false');
+        });
+        if (!wasSelected) {
+          chip.classList.add('selected');
+          chip.setAttribute('aria-pressed', 'true');
+        }
       });
     });
 
@@ -479,6 +509,7 @@
     // 訪問記録（会えた）
     document.getElementById('btn-add-visit').addEventListener('click', () => window.UI.openVisitModal());
     document.getElementById('btn-close-visit').addEventListener('click', window.UI.closeVisitModal);
+    document.getElementById('btn-cancel-visit').addEventListener('click', window.UI.closeVisitModal);
     document.querySelector('#modal-visit .modal-backdrop').addEventListener('click', window.UI.closeVisitModal);
     document.getElementById('btn-save-visit').addEventListener('click', () => {
       const data = window.UI.getVisitFormData();
@@ -493,6 +524,7 @@
     // 不在記録
     document.getElementById('btn-add-absent').addEventListener('click', () => window.UI.openAbsentModal());
     document.getElementById('btn-close-absent').addEventListener('click', window.UI.closeAbsentModal);
+    document.getElementById('btn-cancel-absent').addEventListener('click', window.UI.closeAbsentModal);
     document.querySelector('#modal-absent .modal-backdrop').addEventListener('click', window.UI.closeAbsentModal);
     document.getElementById('btn-save-absent').addEventListener('click', () => {
       const data = window.UI.getAbsentFormData();
@@ -668,6 +700,7 @@
     document.getElementById('btn-filter').addEventListener('click', () => {
       const bar = document.getElementById('filter-bar');
       bar.classList.toggle('hidden');
+      document.getElementById('btn-filter').setAttribute('aria-expanded', String(!bar.classList.contains('hidden')));
       if (!bar.classList.contains('hidden')) {
         window.UI.renderFilterBar(activeTagIds, toggleTagFilter);
       }
@@ -705,7 +738,10 @@
     const history = window.UI.getVisitHistory();
     const valid = history.filter(item => item && item.date);
     const lastVisitField = document.getElementById('field-last-visit');
-    document.querySelectorAll('#time-options .time-chip').forEach(c => c.classList.remove('selected'));
+    document.querySelectorAll('#time-options .time-chip').forEach(c => {
+      c.classList.remove('selected');
+      c.setAttribute('aria-pressed', 'false');
+    });
 
     if (valid.length === 0) {
       lastVisitField.value = '';
@@ -717,7 +753,10 @@
 
     if (!latest.absent && latest.time) {
       const chip = document.querySelector(`#time-options .time-chip[data-value="${latest.time}"]`);
-      if (chip) chip.classList.add('selected');
+      if (chip) {
+        chip.classList.add('selected');
+        chip.setAttribute('aria-pressed', 'true');
+      }
     }
   }
 
@@ -763,6 +802,7 @@
   // ===== Service Worker / アプリ更新 =====
   let updateReloading = false;
   let pendingUpdateBuildId = '';
+  const watchedServiceWorkerRegistrations = new WeakSet();
 
   function registerSW() {
     if (!('serviceWorker' in navigator)) return;
@@ -784,7 +824,8 @@
   }
 
   function watchServiceWorkerUpdate(reg) {
-    if (!reg) return;
+    if (!reg || watchedServiceWorkerRegistrations.has(reg)) return;
+    watchedServiceWorkerRegistrations.add(reg);
 
     if (reg.waiting && navigator.serviceWorker.controller) {
       showAppUpdateNotice(reg, APP_BUILD_ID);
@@ -894,7 +935,6 @@
       btn.addEventListener('click', () => triggerAppUpdate(true));
     }
 
-    if (reg) watchServiceWorkerUpdate(reg);
   }
 
   function reloadWithBuildParam(buildId) {
