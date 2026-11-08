@@ -8,7 +8,7 @@
   const LIST_INITIAL_LIMIT = 50;
   const LIST_MORE_LIMIT = 50;
   const TRASH_PURGE_KEY = 'vm_last_trash_purge';
-  const APP_BUILD_ID = '20260926-ui5';
+  const APP_BUILD_ID = '20261108-addr1';
   const UPDATE_RESULT_KEY = 'vm_update_result';
 
   // ===== 初期化 =====

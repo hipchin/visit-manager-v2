@@ -387,14 +387,19 @@ window.UI = (() => {
   function buildReadableAddress(data) {
     if (!data) return '';
     const a = data.address || {};
+    // 日本の住所は「都道府県→郡→市区町村→区→町名→丁目→番地」の順で、道路名を含まない。
+    // road（最寄りの道路名）を連結すると「港北区二丁目綱島街道」のような実在しない住所になるため使わない。
+    // 区・町名・丁目は別キーに分かれて返るため、片方だけでなく該当するものをすべて採用する。
     const parts = [
       a.province || a.state,
+      a.county,
       a.city || a.town || a.village || a.municipality,
-      a.city_district || a.borough || a.ward || a.suburb,
-      a.neighbourhood || a.quarter,
-      a.road,
+      a.city_district || a.borough || a.ward,
+      a.suburb,
+      a.quarter,
+      a.neighbourhood,
       a.house_number
-    ].filter(Boolean);
+    ].filter(Boolean).map(part => String(part).trim()).filter(Boolean);
 
     const uniqueParts = [];
     parts.forEach(part => {
@@ -402,7 +407,14 @@ window.UI = (() => {
     });
 
     if (uniqueParts.length >= 2) return uniqueParts.join('');
-    if (data.display_name) return String(data.display_name).split(',').slice(0, 5).map(s => s.trim()).join(' ');
+    if (data.display_name) {
+      // display_name は「小さい単位, …, 大きい単位, 郵便番号, 日本」の順なので、国名・郵便番号を除いて逆順に並べる。
+      const segments = String(data.display_name)
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s && s !== '日本' && s !== 'Japan' && !/^〒?\d{3}-?\d{4}$/.test(s));
+      return segments.reverse().join('');
+    }
     return '';
   }
 
