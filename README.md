@@ -26,14 +26,19 @@ visit-manager/
 ├── icons/
 │   ├── icon-192.png
 │   └── icon-512.png
-├── .github/
-│   └── workflows/
-│       └── deploy.yml
 ├── README.md
 ├── PROJECT_CONTEXT.md
+├── PROJECT_DESIGN.md
+├── ARCHITECTURE.md
+├── DATA_SCHEMA.md
+├── DECISIONS.md
+├── DEVELOPMENT_RULES.md
+├── AI_GUIDELINES.md
 ├── CHANGELOG.md
 └── TODO.md
 ```
+
+GitHub Pages は `main` ブランチのリポジトリ直下をそのまま公開している（ワークフローファイルは使っていない）。
 
 ## 主な機能
 

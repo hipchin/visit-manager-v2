@@ -25,8 +25,13 @@
 - 画面遷移時はキャッシュを即時表示し、バックグラウンドで最新版を取得する方式へ変更
 - `vm_visits`、`vm_trash`、`vm_tags`のJSON解析を起動中1回に抑えるよう変更
 
+### Removed
+
+- ZIP差し替え運用時代の作業メモと一回限りの更新スクリプトを削除（`INDEX_HTML_VERSION_PATCH.md`、`INDEX_VERSION_PATCH.txt`、`PACKAGE_CONTENTS.json`、`README_UPDATE.md`、`README_UPLOAD.txt`、`UPLOAD_AND_REPAIR_INSTRUCTIONS.md`、`UPLOAD_INSTRUCTIONS.md`、`update_tool/`）。アプリ本体・保存データには影響なし
+
 ### Fixed
 
+- READMEのファイル構成から、存在しない `.github/workflows/deploy.yml` を削除し、設計ドキュメントを追記
 - 現在地・地図から取得した住所に最寄りの道路名が混ざり（例：「港北区二丁目綱島街道」）、町名が抜ける問題を修正。日本の住所順（都道府県・郡・市区町村・区・町名・丁目・番地）で組み立てるよう変更
 - 住所候補のフォールバック表示が逆順（小さい単位から）になる問題を修正
 - 住所候補で町名と丁目が重なり「日吉日吉二丁目」のように二重表示される問題を修正。フォールバック表示から道路名・店舗名・駅名を除外
