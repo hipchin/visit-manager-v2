@@ -387,22 +387,50 @@ window.UI = (() => {
   function buildReadableAddress(data) {
     if (!data) return '';
     const a = data.address || {};
+    // 日本の住所は「都道府県→郡→市区町村→区→町名→丁目→番地」の順で、道路名を含まない。
+    // road（最寄りの道路名）を連結すると「港北区二丁目綱島街道」のような実在しない住所になるため使わない。
+    // 区・町名・丁目は別キーに分かれて返るため、片方だけでなく該当するものをすべて採用する。
     const parts = [
       a.province || a.state,
+      a.county,
       a.city || a.town || a.village || a.municipality,
-      a.city_district || a.borough || a.ward || a.suburb,
-      a.neighbourhood || a.quarter,
-      a.road,
+      a.city_district || a.borough || a.ward,
+      a.suburb,
+      a.quarter,
+      a.neighbourhood,
       a.house_number
-    ].filter(Boolean);
+    ].filter(Boolean).map(part => String(part).trim()).filter(Boolean);
 
     const uniqueParts = [];
-    parts.forEach(part => {
-      if (!uniqueParts.includes(part)) uniqueParts.push(part);
+    parts.forEach((part, i) => {
+      if (uniqueParts.includes(part)) return;
+      // 丁目が町名を含む場合（quarter「日吉」と neighbourhood「日吉二丁目」）は町名を省き、「日吉日吉二丁目」にしない。
+      if (parts.slice(i + 1).some(later => later !== part && later.startsWith(part))) return;
+      uniqueParts.push(part);
     });
 
     if (uniqueParts.length >= 2) return uniqueParts.join('');
-    if (data.display_name) return String(data.display_name).split(',').slice(0, 5).map(s => s.trim()).join(' ');
+    if (data.display_name) {
+      // display_name は「小さい単位, …, 大きい単位, 郵便番号, 日本」の順なので、国名・郵便番号を除いて逆順に並べる。
+      // 道路名・店舗名・駅名など行政区画でない要素も display_name に含まれるため、address の該当値と一致するものは除く。
+      const adminKeys = [
+        'province', 'state', 'county', 'city', 'town', 'village', 'municipality',
+        'city_district', 'borough', 'ward', 'suburb', 'quarter', 'neighbourhood', 'house_number'
+      ];
+      const nonAdminValues = new Set(
+        Object.entries(a)
+          .filter(([key]) => !adminKeys.includes(key))
+          .map(([, value]) => String(value).trim())
+      );
+      const segments = String(data.display_name)
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s && s !== '日本' && s !== 'Japan' && !/^〒?\d{3}-?\d{4}$/.test(s) && !nonAdminValues.has(s));
+      const ordered = [...new Set(segments.reverse())];
+      return ordered
+        .filter((seg, i) => !ordered.slice(i + 1).some(later => later !== seg && later.startsWith(seg)))
+        .join('');
+    }
     return '';
   }
 
